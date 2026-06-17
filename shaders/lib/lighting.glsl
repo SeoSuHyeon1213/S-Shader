@@ -6,9 +6,11 @@ const vec3 MOON_LIGHT_COLOR   = vec3(0.749, 0.847, 1.000); // cool blue moonligh
 const vec3 TORCH_LIGHT_COLOR  = vec3(0.961, 0.522, 0.247); // #F5853F
 const vec3 TORCH_EDGE_COLOR   = vec3(1.000, 0.720, 0.420); // softer warm edge for held-light falloff
 const vec3 LAVA_LIGHT_COLOR   = vec3(1.000, 0.227, 0.125); // #FF3A20
-const vec3 RAIN_MOOD_COLOR    = vec3(0.204, 0.137, 0.651); // #3423A6
+const vec3 LAVA_EDGE_COLOR    = vec3(1.000, 0.478, 0.239); // softer lava spill
+const vec3 RAIN_ACCENT_COLOR  = vec3(0.204, 0.137, 0.651); // #3423A6
+const vec3 RAIN_AMBIENT_COLOR = vec3(0.340, 0.360, 0.530); // desaturated rainy ambient tint
 
-const float SUN_HORIZON_GLOW = 0.35; // extra highlight warmth during sunrise/sunset
+const float SUN_HORIZON_GLOW = 0.35; // base highlight warmth during sunrise/sunset
 const float NIGHT_READABILITY_LIFT = 0.10; // subtle blue lift on dark areas at night
 
 const float HELD_LIGHT_RANGE_BOOST = 1.15;
@@ -43,8 +45,8 @@ vec3 getSunColor(float dayMask) {
 }
 
 // Full strength at midday, with an extra glow during the sunrise/sunset transition
-float getSunIntensity(float dayMask) {
-    return dayMask * (1.0 + getSunHorizonFactor(dayMask) * SUN_HORIZON_GLOW);
+float getSunIntensity(float dayMask, float sunsetGlowStrength) {
+    return dayMask * (1.0 + getSunHorizonFactor(dayMask) * SUN_HORIZON_GLOW * sunsetGlowStrength);
 }
 
 float getHeldLightLevel(int heldBlockLightValue, int heldBlockLightValue2) {
@@ -109,7 +111,10 @@ vec3 applyMoodLighting(
     int heldBlockLightValue2,
     float lavaMask,
     float frameTimeCounter,
-    float torchIntensity
+    float torchIntensity,
+    float dayLightStrength,
+    float nightLightStrength,
+    float sunsetGlowStrength
 ) {
     float luma = getLuminance(color);
     float shadowMask = 1.0 - smoothstep(0.12, 0.55, luma);
@@ -117,8 +122,9 @@ vec3 applyMoodLighting(
     float rain = clamp(rainStrength, 0.0, 1.0);
     float dayMask = getDayMask(worldTime);
     float nightMask = getNightMask(worldTime);
-    vec3 sunColor = getSunColor(dayMask);
-    float sunIntensity = getSunIntensity(dayMask);
+    vec3 sunColor = getSunColor(dayMask) * dayLightStrength;
+    vec3 moonColor = MOON_LIGHT_COLOR * nightLightStrength;
+    float sunIntensity = getSunIntensity(dayMask, sunsetGlowStrength) * dayLightStrength;
     float sunGlow = getSunHorizonFactor(dayMask);
     float handLightStrength = getHandLightStrength(heldBlockLightValue, heldBlockLightValue2);
     float heldLightBase = handLightStrength
@@ -128,21 +134,22 @@ vec3 applyMoodLighting(
     float torchFlicker = getTorchFlicker(frameTimeCounter, handLightStrength);
     float weatherDampen = 1.0 - rain * 0.35;
 
-    vec3 skyTint = mix(MOON_LIGHT_COLOR, sunColor, dayMask);
+    vec3 skyTint = mix(moonColor, sunColor, dayMask);
     vec3 shadowTint = mix(vec3(0.86, 0.92, 1.06), skyTint, 0.35 + nightMask * 0.25);
-    vec3 highlightTint = mix(MOON_LIGHT_COLOR, sunColor, sunIntensity * 0.85 + 0.15);
-    vec3 rainReflectTint = mix(vec3(0.85, 0.90, 1.0), RAIN_MOOD_COLOR, 0.25);
+    vec3 highlightTint = mix(moonColor, sunColor, sunIntensity * 0.85 + 0.15);
+    vec3 rainReflectTint = mix(vec3(0.85, 0.90, 1.0), RAIN_ACCENT_COLOR, 0.18);
+    vec3 lavaSpill = mix(LAVA_EDGE_COLOR, LAVA_LIGHT_COLOR, 0.45);
 
     color = mix(color, color * shadowTint, shadowMask * strength * 0.35);
-    color = mix(color, color * highlightTint, highlightMask * strength * (0.25 + sunGlow * 0.15) * weatherDampen);
+    color = mix(color, color * highlightTint, highlightMask * strength * (0.25 + sunGlow * 0.15 * sunsetGlowStrength) * weatherDampen);
     color = applyHeldTorchLight(color, heldLightMask, strength, torchIntensity, torchFlicker);
-    color = mix(color, color * LAVA_LIGHT_COLOR + LAVA_LIGHT_COLOR * 0.18, lavaMask * strength * 0.55);
-    color += highlightMask * rain * strength * rainReflectTint * 0.08;
-    color = mix(color, color * RAIN_MOOD_COLOR, rain * strength * 0.12);
+    color = mix(color, color * lavaSpill + LAVA_LIGHT_COLOR * 0.14, lavaMask * strength * 0.45);
+    color += highlightMask * rain * strength * rainReflectTint * 0.06;
+    color = mix(color, color * RAIN_AMBIENT_COLOR, rain * strength * 0.07);
     color = mix(color, vec3(getLuminance(color)), rain * strength * 0.10);
 
     // Night readability: lift dark areas with a touch of cool moonlight
-    color += MOON_LIGHT_COLOR * shadowMask * nightMask * strength * NIGHT_READABILITY_LIFT;
+    color += moonColor * shadowMask * nightMask * strength * NIGHT_READABILITY_LIFT;
 
     return color;
 }

@@ -3,17 +3,22 @@
 uniform sampler2D texture;
 uniform sampler2D lightmap;
 uniform float frameTimeCounter;
+uniform float rainStrength;
+uniform int worldTime;
+uniform mat4 gbufferModelViewInverse;
 
 varying vec2 texCoord;
 varying vec2 lmCoord;
 varying vec4 glColor;
 varying vec3 viewNormal;
+varying vec3 viewDir;
 varying float isWater;
+
+#include "/lib/sky.glsl"
 
 /* DRAWBUFFERS:02 */
 
 const vec3 WATER_TINT = vec3(0.62, 0.82, 1.00);
-const vec3 WATER_SKY_REFLECTION = vec3(0.58, 0.74, 1.0);
 const float WATER_MIN_ALPHA = 0.42;
 const float WATER_MAX_ALPHA = 0.72;
 const float WATER_WAVE_NORMAL_STRENGTH = 0.16;
@@ -49,11 +54,13 @@ void main() {
     float facing = clamp(abs(waterNormal.z), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 2.0) * isWater;
     float specular = getWaterSpecular(waterNormal, ripple) * isWater;
+    vec3 worldDir = normalize((gbufferModelViewInverse * vec4(normalize(viewDir), 0.0)).xyz);
+    vec3 skyReflection = getSkyWaterReflectionColor(worldDir, worldTime, rainStrength);
 
     vec3 baseColor = albedo.rgb * lightColor;
     vec3 waterColor = mix(baseColor, baseColor * WATER_TINT, 0.34);
     waterColor += WATER_TINT * (0.018 + fresnel * 0.030 + ripple * 0.008) * isWater;
-    waterColor += WATER_SKY_REFLECTION * (fresnel * 0.055 + specular * 0.050) * isWater;
+    waterColor += skyReflection * (fresnel * 0.055 + specular * 0.050) * isWater;
 
     vec3 outColor = mix(baseColor, waterColor, isWater);
     float waterAlpha = clamp(max(albedo.a, WATER_MIN_ALPHA) + fresnel * 0.10, WATER_MIN_ALPHA, WATER_MAX_ALPHA);

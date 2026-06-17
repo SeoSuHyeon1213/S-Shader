@@ -22,7 +22,8 @@ void main() {
     // colortex0 alpha as real transparency, so material masks live in colortex2.
     gl_FragData[0] = vec4(albedo.rgb, 1.0);
 
-    // colortex2 carries terrain material masks:
-    // R = upward wettable floor, G = vertical wall, B = lava/emissive block.
-    gl_FragData[1] = vec4(wetMaskBase, wallMaskBase, isLava, 1.0);
+    // colortex2 carries material masks:
+    // R = material-weighted wet floor, G = material-weighted wet wall,
+    // B = lava/emissive block, A = water. Terrain never writes water mask.
+    gl_FragData[1] = vec4(wetMaskBase, wallMaskBase, isLava, 0.0);
 }

@@ -10,7 +10,6 @@ uniform sampler2D shadowtex0; // sun/moon shadow map
 
 uniform float near;
 uniform float far;
-uniform vec3 fogColor;
 uniform float rainStrength;
 uniform float frameTimeCounter;
 uniform int worldTime;
@@ -24,6 +23,7 @@ uniform mat4 shadowProjection;
 
 #include "/lib/color.glsl"
 #include "/lib/fog.glsl"
+#include "/lib/sky.glsl"
 #include "/lib/shadows.glsl"
 #include "/lib/lighting.glsl"
 #include "/lib/wet.glsl"
@@ -45,9 +45,7 @@ const float VIGNETTE_MIN   = 0.6; // never fully black at the edges
 #define FOG_DENSITY 3.0 // Fog falloff sharpness near the render distance edge [1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0 10.0 12.0]
 const float RAIN_FOG_PULL = 0.3; // How much rain pulls the fog start closer (fraction of FOG_START)
 const float FOG_AMBIENT_PULL = 0.25; // Keep fog stable while still dimming slightly in dark scenes
-const float SKY_HORIZON_FOG_DAY = 0.22; // Daytime sky/horizon fog strength
-const float SKY_HORIZON_FOG_NIGHT = 0.035; // Keep night sky from splitting into visible bands
-const float SKY_HORIZON_FOG_RAIN = 0.12; // Extra horizon haze during rain
+const float HORIZON_FOG_PULL = 0.18; // Blends distant terrain into the shared sky horizon curve
 
 // ---- Bloom ----
 #define BLOOM_INTENSITY 0.16 // Bloom strength [0.0 0.05 0.1 0.15 0.16 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0]
@@ -55,6 +53,9 @@ const float SKY_HORIZON_FOG_RAIN = 0.12; // Extra horizon haze during rain
 // ---- Lighting ----
 #define LIGHTING_STRENGTH 0.5 // Mood lighting strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
 #define TORCH_LIGHT_INTENSITY 0.85 // Held torch intensity [0.0 0.25 0.5 0.65 0.75 0.85 1.0 1.15 1.3 1.5]
+#define DAY_LIGHT_STRENGTH 1.0 // Daylight strength [0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4]
+#define NIGHT_LIGHT_STRENGTH 1.0 // Moonlight/night readability strength [0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3]
+#define SUNSET_GLOW_STRENGTH 1.0 // Sunrise/sunset warm glow strength [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
 
 // ---- Rain / Wet Surfaces ----
 #define RAIN_REFLECTION_INTENSITY 0.45 // Fake wet reflection intensity [0.0 0.15 0.3 0.45 0.6 0.75 0.9 1.0]
@@ -69,6 +70,9 @@ vec3 getWorldPosition(vec3 viewPos) {
     return (gbufferModelViewInverse * vec4(viewPos, 1.0)).xyz;
 }
 
+vec3 getWorldDirection(vec3 viewPos) {
+    return normalize((gbufferModelViewInverse * vec4(normalize(viewPos), 0.0)).xyz);
+}
 void main() {
     vec4 sceneSample = texture2D(colortex0, texCoord);
     vec3 color = sceneSample.rgb;
@@ -86,32 +90,35 @@ void main() {
     float dist = linearizeDepth(depth, near, far);
     vec3 viewPos = getViewPosition(texCoord, depth);
     vec3 worldPos = getWorldPosition(viewPos);
+    vec3 worldDir = getWorldDirection(viewPos);
+    vec3 skyReflectionColor = getSkyWaterReflectionColor(worldDir, worldTime, rainStrength);
     float sceneMask = 1.0 - step(1.0, depth);
     float shadowVisibility = getShadowVisibility(worldPos, dist, far, sceneMask, worldTime, rainStrength);
+    float rainExposure = getRainExposure(worldPos, dist, far, sceneMask);
+    float surfaceRainStrength = rainStrength * rainExposure;
     color = applyShadow(color, shadowVisibility, sceneMask);
 
     // Mood lighting
-    color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, lavaMask, frameTimeCounter, TORCH_LIGHT_INTENSITY);
+    color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, lavaMask, frameTimeCounter, TORCH_LIGHT_INTENSITY, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
 
     // Rain-wide wet highlight, then surface-biased fake reflection
-    color = applyGlobalWetHighlight(color, sceneMask, rainStrength, RAIN_REFLECTION_INTENSITY);
-    color = applyFakeWetReflection(color, texCoord, depth, sceneMask, terrainWetMask, terrainWallMask, rainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
-    color = applyWaterSurface(color, colortex0, texCoord, sceneMask, waterMask, rainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
-    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, RAIN_REFLECTION_INTENSITY);
+    color = applyGlobalWetHighlight(color, sceneMask, surfaceRainStrength, RAIN_REFLECTION_INTENSITY);
+    color = applyFakeWetReflection(color, texCoord, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
+    color = applyWetTerrainScreenReflection(color, colortex0, texCoord, worldDir, depth, sceneMask, terrainWetMask, terrainWallMask, skyReflectionColor, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
+    color = applyWetWallRunoff(color, texCoord, worldDir, depth, sceneMask, terrainWallMask, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
+    color = applyWetSpecularBRDF(color, worldDir, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength, worldTime, RAIN_REFLECTION_INTENSITY);
+    color = applyWaterSurface(color, colortex0, texCoord, sceneMask, waterMask, skyReflectionColor, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
+    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, skyReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, RAIN_REFLECTION_INTENSITY);
 
     // Fog
     float fogStartRatio = FOG_START * (1.0 - rainStrength * RAIN_FOG_PULL);
     if (depth < 1.0) {
         float fogFactor = getFogFactor(dist, far, fogStartRatio, FOG_DENSITY);
-        vec3 ambientFogColor = getAmbientFogColor(fogColor, color, FOG_AMBIENT_PULL);
+        float horizonFog = skyHorizonMask(worldDir) * smoothstep(far * 0.35, far, dist);
+        fogFactor = clamp(fogFactor + horizonFog * HORIZON_FOG_PULL * (1.0 + rainStrength * 0.45), 0.0, 1.0);
+        vec3 skyFogColor = getSkyFogColor(worldDir, color, worldTime, rainStrength);
+        vec3 ambientFogColor = getAmbientFogColor(skyFogColor, color, FOG_AMBIENT_PULL);
         color = applyFog(color, ambientFogColor, fogFactor);
-    } else {
-        float dayMask = getDayMask(worldTime);
-        float nightMask = 1.0 - dayMask;
-        float horizonMask = pow(1.0 - smoothstep(0.02, 0.74, texCoord.y), 1.65);
-        float skyFogStrength = mix(SKY_HORIZON_FOG_NIGHT, SKY_HORIZON_FOG_DAY, dayMask) + rainStrength * SKY_HORIZON_FOG_RAIN;
-        vec3 skyFogColor = mix(color, fogColor, 0.25 + dayMask * 0.55 + rainStrength * 0.20);
-        color = applyFog(color, skyFogColor, horizonMask * skyFogStrength * (1.0 - nightMask * 0.35));
     }
 
     // Color grading

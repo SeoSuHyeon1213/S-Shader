@@ -7,6 +7,7 @@ const float SHADOW_SLOPE_BIAS = 2.4;
 const float SHADOW_DISTANCE_BIAS = 0.0015;
 const float SHADOW_EDGE_FADE = 0.045;
 const float SHADOW_TEXEL_SIZE = 1.0 / 2048.0;
+const float RAIN_EXPOSURE_MIN = 0.08;
 
 float getShadowDayFactor(int worldTime) {
     float time = mod(float(worldTime), 24000.0);
@@ -74,6 +75,40 @@ float getShadowVisibility(
     float shadowStrength = distanceFade * edgeFade * weatherFade * timeFade;
 
     return mix(1.0, visibility, shadowStrength);
+}
+
+float getRainExposure(
+    vec3 worldPos,
+    float viewDistance,
+    float farPlane,
+    float sceneMask
+) {
+    if (sceneMask < 0.5) return 1.0;
+
+    vec4 shadowClip = shadowProjection * shadowModelView * vec4(worldPos, 1.0);
+    vec3 shadowPos = shadowClip.xyz / shadowClip.w;
+    shadowPos = shadowPos * 0.5 + 0.5;
+
+    if (shadowPos.x <= 0.0 || shadowPos.x >= 1.0 ||
+        shadowPos.y <= 0.0 || shadowPos.y >= 1.0 ||
+        shadowPos.z <= 0.0 || shadowPos.z >= 1.0) {
+        return 1.0;
+    }
+
+    float bias = getShadowBias(shadowPos, viewDistance, farPlane) * 1.35;
+    float visibility = 0.0;
+    visibility += sampleShadowMap(shadowPos, vec2( 0.0,  0.0), bias) * 1.35;
+    visibility += sampleShadowMap(shadowPos, vec2(-1.0,  0.0), bias);
+    visibility += sampleShadowMap(shadowPos, vec2( 1.0,  0.0), bias);
+    visibility += sampleShadowMap(shadowPos, vec2( 0.0, -1.0), bias);
+    visibility += sampleShadowMap(shadowPos, vec2( 0.0,  1.0), bias);
+    visibility /= 5.35;
+
+    float distanceFade = 1.0 - smoothstep(farPlane * 0.62, farPlane, viewDistance);
+    float edgeFade = getShadowEdgeFade(shadowPos);
+    float exposure = smoothstep(0.18, 0.82, visibility);
+
+    return mix(1.0, clamp(exposure, RAIN_EXPOSURE_MIN, 1.0), distanceFade * edgeFade);
 }
 
 vec3 applyShadow(vec3 color, float visibility, float sceneMask) {
