@@ -1,69 +1,43 @@
 # S-Shader
 
-```
-I'm making minecraft shader for Iris.
-I'm using claude-code and codex (actually, it's almost vibe coding)
-아이리스용 쉐이더 제작 중.
-클로드 코드와 코덱스를 사용하여 제작 사실상 바이브 코딩
+S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더팩입니다. 사실적인 렌더링을 완전히 재현하기보다는, 부드러운 색감, 안개, 하늘 색 통합, 젖은 표면, 횃불 조명, 그림자 대비를 통해 분위기 있는 화면을 만드는 것을 목표로 합니다.
 
+현재 개발은 Codex와 Claude Code를 함께 사용해 빠르게 실험하고 있으며, 실제 게임 플레이 스크린샷을 기준으로 색감과 효과를 계속 조정하고 있습니다.
 
-S-s-Shader is a Minecraft shader pack for Iris, focused on mood-heavy post processing rather than realistic rendering.
+## 주요 기능
 
-S-s-Shader는 사실적인 렌더링보다는 분위기 중심의 후처리에 집중한 Iris용 마인크래프트 쉐이더팩입니다.
+- 노출, 대비, 채도, 따뜻한 색 보정, ACES 톤 매핑, 파스텔 톤 기반 색 보정
+- 별도 bloom buffer를 사용한 bloom 추출 및 blur
+- `lib/sky.glsl` 기반의 하늘, 구름, 안개, 지형 fog, 물 반사 색 체계 통합
+- 낮/밤 전환과 수평선 부근의 색 층 분리 완화
+- 비 오는 날 젖은 바닥, 벽면 물 흐름, 웅덩이 반사, wet specular 표현
+- 물 전용 `gbuffers_water`와 물 mask 기반 Fresnel/flow/rough reflection 표현
+- 횃불을 들었을 때 설치된 횃불과 비슷한 따뜻한 주황빛 조명
+- lava mask 기반 발광 보정
+- shadow map 기반 PCF/PCSS 그림자, shadow tint, contact shadow
+- `colortex3` normal buffer 기반 지형 diffuse/form shadow 보정
+- hand/entity 전용 pass를 통한 들고 있는 아이템 반투명 문제 완화
 
-The current goal is a soft atmospheric style built around color grading, vignette, bloom, fog, shadow tinting, torch/lava glow, and rainy wet-surface highlights.
-
-현재 목표는 색보정, 비네트, 블룸, 안개, 그림자 색감, 횃불/용암 발광, 비 오는 날 젖은 표면 하이라이트를 중심으로 한 부드러운 분위기형 스타일입니다.
-```
-
-## Features
-
-- Color grading with exposure, contrast, saturation, warm tint, ACES tonemapping, and pastel tone shaping
-- 노출, 대비, 채도, 따뜻한 틴트, ACES 톤매핑, 파스텔 톤 보정을 포함한 색보정
-- Bloom extraction and blur using a separate bloom buffer
-- 별도 블룸 버퍼를 사용한 블룸 추출 및 블러
-- Depth-based fog with rain-aware distance adjustment
-- 비 오는 날 거리를 반영하는 깊이 기반 안개
-- Vignette for softer screen edges
-- 화면 가장자리를 부드럽게 어둡게 만드는 비네트
-- Mood lighting based on sun, moon, torch, lava, and rain color palettes
-- 태양, 달, 횃불, 용암, 비 색상 팔레트 기반의 분위기 조명
-- Held torch lighting with distance falloff, soft edge glow, and subtle flicker
-- 거리 감쇠, 부드러운 외곽광, 약한 깜빡임을 포함한 손에 든 횃불 조명
-- Lava glow using a terrain lava mask
-- 지형 용암 마스크를 이용한 용암 발광
-- Rainy wet-surface highlight using terrain wet/wall masks
-- 지형 wet/wall 마스크를 이용한 비 오는 날 젖은 표면 하이라이트
-- Basic shadow map sampling with PCF
-- PCF 기반의 기본 shadow map 샘플링
-
-
-## Shadow / Normal Buffer Status
-
-- `SHADOW_MODE = 1` enables the PCSS path by default.
-- `colortex3` stores encoded world normals for terrain and water.
-- Final lighting uses the normal buffer for `NdotL` direct diffuse, back-face form shadow, and shadow-map-based cast shadow blending.
-- Contact shadows are strengthened for closer object grounding.
-- Remaining shadow work: detailed foliage/water/glass/emissive caster rules, cascade or distance-split stability, and translucent/colored shadows.
-## Main Color Palette
+## 주요 색상 팔레트
 
 - Sun: `#F1FEC6`
-- 태양: `#F1FEC6`
 - Moon: `#BFD8FF`
-- 달: `#BFD8FF`
 - Torch: `#F5853F`
-- 횃불: `#F5853F`
 - Lava: `#FF3A20`
-- 용암: `#FF3A20`
-- Rain: `#3423A6`
-- 비: `#3423A6`
+- Rain accent: `#3423A6`
 
 ## Shader Options
 
-Options are grouped under the `MOOD` screen in Iris:
+옵션은 Iris/NeOculus 셰이더 옵션 화면에 직접 노출됩니다.
 
-옵션은 Iris의 `MOOD` 화면 아래에 묶여 있습니다.
-
+- `SHADOW_MODE`: `0` = Poisson PCF, `1` = PCSS
+- `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사, `1` = 약한 SSR 추가
+- `ENABLE_CONTACT_SHADOWS`: 가까운 거리 screen-space contact shadow on/off
+- `ENABLE_NORMAL_FORM_LIGHTING`: normal buffer 기반 지형 입체 조명 on/off
+- `ENABLE_WET_GROUND_LAYER`: 비 오는 날 젖은 바닥 darkening/sheen layer on/off
+- `ENABLE_WET_SCREEN_REFLECTIONS`: 젖은 바닥 screen-space reflection on/off
+- `ENABLE_WET_SPECULAR`: 젖은 표면 BRDF 하이라이트 on/off
+- `ENABLE_WATER_SURFACE`: 물 Fresnel/flow surface shading on/off
 - `EXPOSURE`
 - `CONTRAST`
 - `SATURATION`
@@ -72,6 +46,7 @@ Options are grouped under the `MOOD` screen in Iris:
 - `NIGHT_LIGHT_STRENGTH`
 - `SUNSET_GLOW_STRENGTH`
 - `TORCH_LIGHT_INTENSITY`
+- `CONTACT_SHADOW_INTENSITY`
 - `RAIN_REFLECTION_INTENSITY`
 - `BLOOM_INTENSITY`
 - `BLOOM_THRESHOLD`
@@ -79,15 +54,65 @@ Options are grouped under the `MOOD` screen in Iris:
 - `FOG_START`
 - `VIGNETTE_OUTER`
 
+## Buffer Layout
+
+- `colortex0`: scene color
+- `colortex1`: bloom buffer
+- `colortex2.r`: wet floor mask
+- `colortex2.g`: wall mask
+- `colortex2.b`: lava mask
+- `colortex2.a`: water mask
+- `colortex3.rgb`: encoded world normal
+- `colortex3.a`: valid normal mask
+
+## Sky / Fog Layout
+
+- `gbuffers_skybasic`: 기본 하늘 색을 `lib/sky.glsl`의 공통 sky color로 출력
+- `gbuffers_clouds`: 바닐라 구름 texture alpha를 유지하면서 RGB를 sky color 체계로 보정
+- `gbuffers_skytextured`: 해, 달, 별 texture를 sky color 기반으로 tint
+- `final.fsh`: 지형 fog를 `fogColor` uniform 대신 `getSkyFogColor()` 기반으로 적용
+- `depth >= 1.0` 하늘 영역에는 별도 fog 덧칠을 최소화해 하늘 층 분리를 줄임
+
+## Shadow Status
+
+현재 그림자 구현은 실험 단계입니다.
+
+구현된 부분:
+
+- `shadowtex0`, `shadowModelView`, `shadowProjection` 기반 shadow map sampling
+- `SHADOW_MODE = 0`: 8-sample Poisson PCF
+- `SHADOW_MODE = 1`: 8-sample blocker search + 8-sample filter PCSS
+- `shadowMapResolution = 2048`
+- `shadowDistance = 96.0`
+- `shadowIntervalSize = 0.5`
+- shadow tint와 rain/weather fade
+- screen-space contact shadow
+- normal buffer 기반 terrain form lighting
+- shadow pass의 기본 alpha cutout 및 water/lava/glass caster 제외
+
+남은 작업:
+
+- foliage, glass, emissive block에 대한 더 정교한 caster rule
+- cascade shadow map 또는 distance split 기반 장거리 안정화
+- translucent/colored shadow
+- material별 shadow tint
+- 더 정확한 directional BRDF 조명 반응
+
+## Crash / Stability Debug
+
+NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 불안정을 만들 수 있어, 최근 기능은 옵션으로 분리했습니다.
+
+크래시가 의심될 때 권장 테스트 순서:
+
+1. `ENABLE_WET_SCREEN_REFLECTIONS = 0`
+2. `ENABLE_WATER_SURFACE = 0`
+3. `ENABLE_CONTACT_SHADOWS = 0`
+4. `ENABLE_NORMAL_FORM_LIGHTING = 0`
+
 ## Status
 
-This shader is still in development. Core post-processing, sky/fog unification, wet surfaces, PCSS shadows, contact shadows, and normal-buffer-based terrain form lighting are implemented. In-game testing and visual tuning are still needed across daytime, nighttime, caves, rain, Nether, and End environments.
-
-이 쉐이더는 아직 개발 중입니다. 핵심 후처리 기능은 구현되어 있지만, 낮, 밤, 동굴, 비, 네더, 엔드 환경에서의 인게임 테스트와 색감 튜닝이 아직 필요합니다.
+아직 개발 중인 셰이더팩입니다. 핵심 후처리, 하늘/fog 통합, 젖은 표면, 물 표현, PCSS 그림자, contact shadow, normal buffer 기반 지형 조명은 구현되어 있지만 실제 게임 내 낮, 밤, 동굴, 비, 네더, 엔드 환경에서 추가 튜닝이 필요합니다.
 
 ## License
-```
-MIT License. See `LICENSE` for details.
 
-MIT License를 사용합니다. 자세한 내용은 `LICENSE` 파일을 참고하세요.
-```
+MIT License. 자세한 내용은 `LICENSE` 파일을 참고하세요.

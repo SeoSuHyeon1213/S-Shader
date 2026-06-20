@@ -68,7 +68,7 @@ vec2 getPoissonShadowOffset(int index) {
 }
 
 float samplePoissonShadow(vec3 shadowPos, float bias, float radius, int sampleCount) {
-    float angle = shadowHash12(shadowPos.xy * 2048.0 + shadowPos.z) * 6.2831853;
+    float angle = 0.0; // Fixed kernel keeps PCF stable while the camera moves.
     float visibility = sampleShadowMap(shadowPos, vec2(0.0), bias) * 1.35;
     float weightSum = 1.35;
 
@@ -86,7 +86,7 @@ float samplePoissonShadow(vec3 shadowPos, float bias, float radius, int sampleCo
 
 
 float findAverageBlockerDepth(vec3 shadowPos, float bias, float searchRadius) {
-    float angle = shadowHash12(shadowPos.xy * 2048.0 + shadowPos.z * 17.0) * 6.2831853;
+    float angle = 0.0; // Fixed blocker kernel avoids PCSS crawling during movement.
     float blockerSum = 0.0;
     float blockerCount = 0.0;
 
