@@ -4,6 +4,34 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-06-21 - Shadow Distance Split Stabilization
+
+### Changed
+
+- Kept `shadowMapResolution = 2048`, `shadowDistance = 96.0`, and `shadowIntervalSize = 8.0` as the stable default shadow-map setup.
+- Added near/mid/far distance split fade inside `getShadowVisibility()` so close shadows stay clearer while far shadows fade into the sky/fog tint instead of shimmering sharply.
+- Added `getShadowStableFilterRadius()` to clamp PCSS penumbra growth by distance and reduce mid/far shadow deformation while moving.
+- Kept fixed PCF/PCSS sample rotation (`angle = 0.0`) to avoid filter crawling.
+- Tightened contact shadow range, radius, thickness, and final strength while keeping `ENABLE_CONTACT_SHADOWS = 0` as the stable default.
+
+### Test Notes
+
+- Compare `shadowIntervalSize = 4.0`, `8.0`, and `16.0` only after checking the default movement stability.
+- If distant reprojection is still visible, test `shadowDistance = 64.0`; if far terrain shadow loss is too obvious, keep `96.0`.
+## 2026-06-21 - Near Mid Far Shadow Stabilization
+
+### Changed
+
+- single shadow map 한계 안에서 cascade처럼 보이도록 near/mid/far 거리별 shadow strength fade를 실제 `getShadowVisibility()` 경로에 적용.
+- far 구간에서는 선명한 그림자를 유지하려 하지 않고 shadow strength를 부드럽게 낮춰 플레이어 이동 중 재투영 티가 덜 나도록 조정.
+- PCSS filter radius를 거리 구간별로 안정화해 mid/far 구간의 penumbra 변화가 과하게 출렁이지 않도록 변경.
+- contact shadow는 기본 off 상태를 유지하되, 켰을 때도 짧은 거리에서만 은은하게 작동하도록 거리, 두께, 반경, 최종 강도를 낮춤.
+
+### Notes
+
+- 기본 안정화 값은 `shadowIntervalSize = 8.0`, `shadowDistance = 96.0` 유지.
+- 추가 안정성이 필요하면 다음 실험은 `shadowDistance = 64.0` 또는 `shadowIntervalSize = 16.0`.
+
 ## 2026-06-20 - Hand Pass Shadow Isolation
 
 ### Fixed

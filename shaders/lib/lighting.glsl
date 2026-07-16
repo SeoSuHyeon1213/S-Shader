@@ -14,8 +14,8 @@ const float SUN_HORIZON_GLOW = 0.35; // base highlight warmth during sunrise/sun
 const float NIGHT_READABILITY_LIFT = 0.035; // subtle blue lift on dark areas at night
 
 const float HELD_LIGHT_RANGE_BOOST = 1.25;
-const float HELD_LIGHT_BRIGHTNESS = 0.32;
-const float HELD_LIGHT_AMBIENT = 0.018;
+const float HELD_LIGHT_BRIGHTNESS = 0.34;
+const float HELD_LIGHT_AMBIENT = 0.024;
 const float HELD_LIGHT_DAY_OUTDOOR_MIN = 0.28;
 const float HELD_LIGHT_FLICKER_AMOUNT = 0.035;
 
@@ -69,7 +69,7 @@ float getHeldLightDistanceFalloff(vec3 viewPos, int heldBlockLightValue, int hel
     float forwardMask = smoothstep(0.05, 0.85, -viewDir.z);
     float centerMask = 1.0 - smoothstep(0.12, 1.20, length(viewDir.xy));
 
-    return smoothFalloff * mix(0.55, 1.0, forwardMask * centerMask);
+    return smoothFalloff * mix(0.72, 1.0, forwardMask * centerMask);
 }
 
 float getHeldLightEnvironmentFactor(vec3 color, float dayMask) {
@@ -111,9 +111,9 @@ vec3 getDirectionalLightVector(int worldTime) {
     return normalize(mix(moonDir, sunDir, skyDayMask(worldTime)));
 }
 
-vec3 getApproxTerrainNormal(vec3 worldDir, float floorMask, float wallMask) {
+vec3 getApproxTerrainNormal(float floorMask, float wallMask) {
     vec3 floorNormal = vec3(0.0, 1.0, 0.0);
-    vec3 wallNormal = normalize(vec3(-worldDir.x, 0.22, -worldDir.z));
+    vec3 wallNormal = normalize(vec3(0.0, 0.22, 1.0));
     float wallBlend = clamp(wallMask / max(floorMask + wallMask, 0.001), 0.0, 1.0);
     return normalize(mix(floorNormal, wallNormal, wallBlend));
 }
@@ -134,7 +134,7 @@ vec3 applyTerrainFormLighting(
     float terrainMask = clamp(materialMask * sceneMask, 0.0, 1.0);
     if (terrainMask <= 0.001) return color;
 
-    vec3 fallbackNormal = getApproxTerrainNormal(worldDir, floorMask, wallMask);
+    vec3 fallbackNormal = getApproxTerrainNormal(floorMask, wallMask);
     vec3 normal = normalize(mix(fallbackNormal, worldNormal, clamp(normalMask, 0.0, 1.0)));
     vec3 lightDir = getDirectionalLightVector(worldTime);
     float dayMask = skyDayMask(worldTime);
@@ -157,7 +157,7 @@ vec3 applyTerrainFormLighting(
 
     vec3 directLight = mix(MOON_LIGHT_COLOR * 0.34, SUN_LIGHT_COLOR, dayMask);
     directLight = mix(directLight, SUN_HORIZON_COLOR, twilight * 0.24);
-    vec3 skyShade = getSkyShadowTint(worldDir, worldTime, rainStrength);
+    vec3 skyShade = getSkyShadowTint(getStableShadowSkyDirection(worldTime), worldTime, rainStrength);
     vec3 normalShade = mix(vec3(0.52, 0.59, 0.74), skyShade, 0.50);
 
     float diffuseAmount = diffuse * visibility * terrainMask * normalConfidence * mix(0.045, 0.125, dayMask) * (1.0 - rain * 0.35);
@@ -218,7 +218,8 @@ vec3 applyMoodLighting(
 
     color = mix(color, color * shadowTint, ambientShadowMask * strength * 0.28);
     color = mix(color, color * highlightTint, highlightMask * strength * (0.25 + sunGlow * 0.15 * sunsetGlowStrength) * weatherDampen * (1.0 - castShadowMask * 0.42));
-    color = applyHeldTorchLight(color, heldLightMask, strength, torchIntensity, torchFlicker);
+    float heldTorchStrength = mix(0.82, 1.0, clamp(strength, 0.0, 1.0));
+    color = applyHeldTorchLight(color, heldLightMask, heldTorchStrength, torchIntensity, torchFlicker);
     color = mix(color, color * lavaSpill + LAVA_LIGHT_COLOR * 0.14, lavaMask * strength * 0.45);
     color += highlightMask * rain * strength * rainReflectTint * 0.06;
     color = mix(color, color * RAIN_AMBIENT_COLOR, rain * strength * 0.07);

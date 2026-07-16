@@ -1,11 +1,11 @@
 // Near-field screen-space contact shadow utilities
 
 const int CONTACT_SHADOW_SAMPLES = 8;
-const float CONTACT_SHADOW_RADIUS = 0.0028;
-const float CONTACT_SHADOW_MAX_DISTANCE = 4.5;
-const float CONTACT_SHADOW_THICKNESS = 0.42;
-const float CONTACT_SHADOW_NEAR_FADE = 1.2;
-const float CONTACT_SHADOW_FAR_FADE = 42.0;
+const float CONTACT_SHADOW_RADIUS = 0.0022;
+const float CONTACT_SHADOW_MAX_DISTANCE = 2.8;
+const float CONTACT_SHADOW_THICKNESS = 0.34;
+const float CONTACT_SHADOW_NEAR_FADE = 0.9;
+const float CONTACT_SHADOW_FAR_FADE = 18.0;
 
 vec3 reconstructContactViewPosition(vec2 uv, float depth, mat4 projectionInverse) {
     vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
@@ -39,7 +39,7 @@ float getContactShadowAmount(
     distanceFade *= smoothstep(0.0, CONTACT_SHADOW_NEAR_FADE, viewDistance);
     if (distanceFade <= 0.001) return 0.0;
 
-    float radiusScale = 1.0;
+    float radiusScale = mix(0.72, 1.05, clamp(viewDistance / CONTACT_SHADOW_FAR_FADE, 0.0, 1.0));
     float occlusion = 0.0;
     float weightSum = 0.0;
 
@@ -84,7 +84,7 @@ vec3 applyContactShadow(
     vec3 tint = getSkyShadowTint(worldDir, worldTime, rainStrength);
     float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
     float surfaceProtection = mix(0.55, 1.0, smoothstep(0.05, 0.34, luma));
-    float amount = contact * intensity * surfaceProtection;
+    float amount = contact * intensity * 0.58 * surfaceProtection;
 
     return mix(color, color * tint, amount);
 }

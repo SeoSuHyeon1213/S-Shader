@@ -114,7 +114,7 @@ void main() {
     float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldTime, rainStrength);
     float rainExposure = getRainExposure(worldPos, dist, far, terrainSceneMask);
     float surfaceRainStrength = rainStrength * rainExposure;
-    color = applyShadow(color, shadowVisibility, terrainSceneMask, worldDir, worldTime, rainStrength, terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask);
+    color = applyShadow(color, shadowVisibility, terrainSceneMask, worldTime, rainStrength, terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask);
 #if ENABLE_CONTACT_SHADOWS == 1
     color = applyContactShadow(color, depthtex0, texCoord, depth, viewPos, terrainSceneMask, gbufferProjectionInverse, dist, worldDir, worldTime, rainStrength, CONTACT_SHADOW_INTENSITY);
 #endif
