@@ -2,7 +2,7 @@
 
 #define SHADOW_MODE 1 // Shadow filter mode: 0 = Poisson PCF, 1 = PCSS blocker search [0 1]
 
-const float SHADOW_DARKNESS = 0.74;
+const float SHADOW_DARKNESS = 0.86;
 const float SHADOW_FADE_START = 0.58;
 const float SHADOW_BIAS = 0.0012;
 const float SHADOW_SLOPE_BIAS = 2.4;
@@ -239,7 +239,7 @@ vec3 getSkyShadowTint(vec3 worldDir, int worldTime, float rainStrength) {
     float twilight = skyTwilightMask(worldTime);
     float rain = clamp(rainStrength, 0.0, 1.0);
 
-    vec3 dayTint = vec3(0.68, 0.76, 0.88);
+    vec3 dayTint = vec3(0.56, 0.64, 0.78);
     vec3 nightTint = vec3(0.46, 0.52, 0.70);
     vec3 twilightTint = vec3(0.78, 0.65, 0.58);
     vec3 weatherTint = vec3(0.56, 0.61, 0.70);
