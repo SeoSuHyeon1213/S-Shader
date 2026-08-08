@@ -432,7 +432,6 @@ vec3 applyWaterSurface(
     vec3 softReflection = mix(skyReflectionColor, waterTint, 0.32 + roughness * 0.24);
     vec3 roughReflection = mix(skyReflectionColor, waterTint, roughness * 0.28 + flow * 0.06);
     vec3 planarFallback = sampleWaterPlanarFallback(sceneTexture, uv, worldDir, roughness, flow);
-    float reflectionBrightness = smoothstep(0.08, 0.72, getLuminance(skyReflectionColor));
     float planarLuma = smoothstep(0.10, 0.90, getLuminance(planarFallback));
 
     color = mix(color, color * vec3(0.86, 0.95, 1.06), mask * 0.18 * horizontalWater);
@@ -440,7 +439,7 @@ vec3 applyWaterSurface(
     color = mix(color, mix(color * deepWaterTint, color * vec3(0.55, 0.72, 0.95), 0.38 + flow * 0.18), mask * waterfallMask * 0.34);
     vec3 stableReflection = mix(roughReflection, planarFallback * vec3(0.58, 0.76, 0.96), planarLuma * WATER_PLANAR_FALLBACK_STRENGTH * horizontalWater);
     vec3 skyMatchedReflection = mix(stableReflection, skyReflectionColor, fresnel * 0.42 + waterfallMask * 0.24);
-    float reflectionAmount = mask * intensity * reflectionBrightness * mix(0.035 + fresnel * 0.105, 0.012, waterfallMask) * horizontalWater;
+    float reflectionAmount = mask * intensity * mix(0.82, 1.0, fresnel) * horizontalWater;
     color = mix(color, skyMatchedReflection, reflectionAmount);
     color += softReflection * mask * intensity * rainBoost * (0.018 + ripple * 0.010 + fresnel * 0.032) * horizontalWater;
     color += waterTint * mask * waterfallMask * (0.010 + flow * 0.012);

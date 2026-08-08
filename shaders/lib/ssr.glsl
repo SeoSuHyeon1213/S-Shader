@@ -6,7 +6,6 @@ const float SSR_STEP_SIZE = 0.48;
 const float SSR_THICKNESS = 0.28;
 const float SSR_MAX_DISTANCE = 48.0;
 const float SSR_ROUGH_BLUR_RADIUS = 0.0045;
-const float SSR_SKY_FALLBACK_STRENGTH = 0.18;
 
 float getScreenEdgeFade(vec2 uv) {
     vec2 edge = min(uv, 1.0 - uv);
@@ -122,7 +121,7 @@ vec3 applyWaterSSR(
     float roughness = clamp(0.42 + rainStrength * 0.34 + length(normal.xy) * 1.35 + waterfallMask * 0.36, 0.30, 1.0);
 
     if (rayDir.z > -0.02) {
-        float fallbackAmount = mask * fresnel * intensity * SSR_SKY_FALLBACK_STRENGTH * horizontalWater;
+        float fallbackAmount = mask * intensity * mix(0.82, 1.0, fresnel) * horizontalWater;
         return mix(color, skyReflectionColor, fallbackAmount);
     }
 
@@ -159,9 +158,7 @@ vec3 applyWaterSSR(
         }
     }
 
-    float reflectionAmount = mask * hitFade * fresnel * intensity * 0.50 * horizontalWater;
-    float fallbackAmount = mask * (1.0 - hitFade) * fresnel * intensity * SSR_SKY_FALLBACK_STRENGTH * horizontalWater;
+    float reflectionAmount = mask * intensity * mix(0.82, 1.0, fresnel) * horizontalWater;
     vec3 reflectionColor = mix(skyReflectionColor, hitColor * vec3(0.68, 0.82, 0.98), hitFade);
-    color = mix(color, skyReflectionColor, fallbackAmount);
     return mix(color, reflectionColor, reflectionAmount);
 }

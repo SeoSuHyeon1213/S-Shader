@@ -55,8 +55,9 @@ void main() {
     float fresnel = pow(1.0 - facing, 2.0) * isWater;
     float specular = getWaterSpecular(waterNormal, ripple) * isWater;
     vec3 worldDir = normalize((gbufferModelViewInverse * vec4(normalize(viewDir), 0.0)).xyz);
-    vec3 skyReflection = getSkyWaterReflectionColor(worldDir, worldTime, rainStrength);
-    vec3 waterTint = getSkyWaterTint(worldDir, worldTime, rainStrength);
+    vec3 reflectionDir = normalize(reflect(worldDir, worldWaterNormal));
+    vec3 skyReflection = getSkyWaterReflectionColor(reflectionDir, worldTime, rainStrength);
+    vec3 waterTint = getSkyWaterTint(reflectionDir, worldTime, rainStrength);
 
     vec3 baseColor = albedo.rgb * lightColor;
     vec3 waterColor = mix(baseColor, baseColor * waterTint, 0.34);
