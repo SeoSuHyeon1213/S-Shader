@@ -8,8 +8,9 @@ const float WET_FLOOR_SPECULAR_POWER = 96.0;
 const float WET_WALL_SPECULAR_POWER = 42.0;
 const float WET_WALL_STREAK_STRENGTH = 0.72;
 const float WET_WALL_DARKEN_STRENGTH = 0.16;
-const float WET_TERRAIN_REFLECTION_STRENGTH = 0.34;
+const float WET_TERRAIN_REFLECTION_STRENGTH = 1.0;
 const float WET_TERRAIN_REFLECTION_OFFSET = 0.026;
+const float WET_TEXTURE_DARKEN_STRENGTH = 0.25;
 const float WATER_PLANAR_FALLBACK_STRENGTH = 0.18;
 const float WATER_ABSORPTION_DISTANCE = 42.0;
 
@@ -45,6 +46,20 @@ float combineWetSurfaceMask(vec3 color, float depth, float sceneMask, float terr
     float wallMask = clamp(terrainWallMask, 0.0, 1.0);
     float normalMask = max(floorMask, wallMask * 0.18);
     return getWetSurfaceMask(color, depth, sceneMask) * normalMask;
+}
+
+vec3 applyRainTextureDarkening(
+    vec3 color,
+    float depth,
+    float sceneMask,
+    float terrainWetMask,
+    float terrainWallMask,
+    float rainStrength
+) {
+    float materialMask = clamp(max(terrainWetMask, terrainWallMask), 0.0, 1.0);
+    float nearSurfaceMask = 1.0 - smoothstep(0.985, 1.0, depth);
+    float wetCoverage = sceneMask * nearSurfaceMask * materialMask * clamp(rainStrength, 0.0, 1.0);
+    return color * (1.0 - wetCoverage * WET_TEXTURE_DARKEN_STRENGTH);
 }
 
 float getWetReflectionStreak(vec2 uv, float frameTimeCounter) {
@@ -335,7 +350,7 @@ vec3 applyWetTerrainScreenReflection(
     float reflectionMask = smoothstep(0.12, 0.86, reflectionLuma) * (1.0 - smoothstep(1.15, 1.75, reflectionLuma)) * edgeFade;
     vec3 matchedReflection = mix(roughReflection * vec3(0.72, 0.86, 1.04), skyReflectionColor, 0.30 + grazing * 0.22 + roughness * 0.18);
 
-    float reflectionAmount = wetMask * puddleMask * reflectionMask * (0.30 + grazing * 0.70) * WET_TERRAIN_REFLECTION_STRENGTH;
+    float reflectionAmount = wetMask * puddleMask * reflectionMask * mix(0.82, 1.0, grazing) * WET_TERRAIN_REFLECTION_STRENGTH;
     color = mix(color, matchedReflection, reflectionAmount);
     color = mix(color, color * vec3(0.82, 0.90, 1.02), wetMask * floorOnly * (0.08 + puddleMask * 0.10));
     color += mix(WET_COOL_HIGHLIGHT, skyReflectionColor, 0.52) * wetMask * puddleMask * (0.018 + streak * grazing * 0.030);

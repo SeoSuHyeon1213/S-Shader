@@ -63,8 +63,8 @@ const float HORIZON_FOG_PULL = 0.10; // Blends distant terrain into the shared s
 #define SUNSET_GLOW_STRENGTH 1.0 // Sunrise/sunset warm glow strength [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
 
 // ---- Rain / Wet Surfaces ----
-#define RAIN_REFLECTION_INTENSITY 0.6 // Fake wet reflection intensity [0.0 0.15 0.3 0.45 0.6 0.75 0.9 1.0]
-#define WATER_REFLECTION_INTENSITY 0.3 // Water reflection strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6]
+#define RAIN_REFLECTION_INTENSITY 0.5 // Wet terrain reflection strength [0.0 0.15 0.3 0.45 0.5 0.6 0.75 0.9 1.0]
+#define WATER_REFLECTION_INTENSITY 0.85 // Water reflection strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.85 0.9 1.0]
 #define WATER_REFLECTION_MODE 0 // Water reflection mode: 0 = stable sky/planar, 1 = SSR [0 1]
 
 // ---- Stability / Debug Toggles ----
@@ -128,12 +128,15 @@ void main() {
     // Mood lighting
     color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, shadowVisibility, lavaMask, frameTimeCounter, TORCH_LIGHT_INTENSITY, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
 
-    // Rain-wide wet highlight, then surface-biased fake reflection
+    // Darken rain-exposed textures before adding wet highlights and reflections.
+    color = applyRainTextureDarkening(color, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength);
     color = applyGlobalWetHighlight(color, terrainSceneMask, surfaceRainStrength, RAIN_REFLECTION_INTENSITY);
 #if ENABLE_WET_GROUND_LAYER == 1
     color = applyWetGroundLayer(color, texCoord, worldDir, depth, sceneMask, terrainWetMask, terrainWallMask, skyReflectionColor, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
 #endif
+#if ENABLE_WET_SCREEN_REFLECTIONS == 0
     color = applyFakeWetReflection(color, texCoord, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
+#endif
 #if ENABLE_WET_SCREEN_REFLECTIONS == 1
     color = applyWetTerrainScreenReflection(color, colortex0, texCoord, worldDir, depth, sceneMask, terrainWetMask, terrainWallMask, skyReflectionColor, surfaceRainStrength, frameTimeCounter, RAIN_REFLECTION_INTENSITY);
 #endif
