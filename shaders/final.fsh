@@ -16,6 +16,7 @@ uniform float frameTimeCounter;
 uniform int worldTime;
 uniform int heldBlockLightValue;
 uniform int heldBlockLightValue2;
+uniform int isEyeInWater;
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
 uniform mat4 gbufferModelViewInverse;
@@ -64,7 +65,7 @@ const float HORIZON_FOG_PULL = 0.10; // Blends distant terrain into the shared s
 
 // ---- Rain / Wet Surfaces ----
 #define RAIN_REFLECTION_INTENSITY 0.5 // Wet terrain reflection strength [0.0 0.15 0.3 0.45 0.5 0.6 0.75 0.9 1.0]
-#define WATER_REFLECTION_INTENSITY 0.85 // Water reflection strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.85 0.9 1.0]
+#define WATER_REFLECTION_INTENSITY 0.6 // Water reflection strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.85 0.9 1.0]
 #define WATER_REFLECTION_MODE 0 // Water reflection mode: 0 = stable sky/planar, 1 = SSR [0 1]
 
 // ---- Stability / Debug Toggles ----
@@ -169,6 +170,10 @@ void main() {
         float shadowAwareFogPull = mix(FOG_AMBIENT_PULL, 0.82, shadowFogMask);
         vec3 ambientFogColor = getAmbientFogColor(skyFogColor, color, shadowAwareFogPull);
         color = applyFog(color, ambientFogColor, fogFactor);
+    }
+
+    if (isEyeInWater == 1) {
+        color = applyUnderwaterLighting(color, worldDir, dist, sceneMask);
     }
 
     // Color grading

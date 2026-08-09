@@ -7,6 +7,8 @@ const vec3 TORCH_LIGHT_COLOR  = vec3(1.000, 0.520, 0.230); // warm installed-tor
 const vec3 TORCH_EDGE_COLOR   = vec3(1.000, 0.610, 0.300); // warm falloff, less milky than pale yellow
 const vec3 LAVA_LIGHT_COLOR   = vec3(1.000, 0.227, 0.125); // #FF3A20
 const vec3 LAVA_EDGE_COLOR    = vec3(1.000, 0.478, 0.239); // softer lava spill
+const vec3 UNDERWATER_TINT_COLOR  = vec3(0.58, 0.82, 1.10);
+const vec3 UNDERWATER_LIGHT_COLOR = vec3(0.12, 0.40, 0.85);
 const vec3 RAIN_ACCENT_COLOR  = vec3(0.204, 0.137, 0.651); // #3423A6
 const vec3 RAIN_AMBIENT_COLOR = vec3(0.340, 0.360, 0.530); // desaturated rainy ambient tint
 
@@ -98,6 +100,18 @@ vec3 applyHeldTorchLight(vec3 color, float heldLightMask, float strength, float 
     color += torchTint * coreMask * strength * torchIntensity * flicker *
              (HELD_LIGHT_AMBIENT + HELD_LIGHT_BRIGHTNESS * surfaceProtection);
     color = mix(color, color * vec3(1.035, 0.985, 0.930), heldLightMask * strength * torchIntensity * 0.10);
+
+    return color;
+}
+
+vec3 applyUnderwaterLighting(vec3 color, vec3 worldDir, float viewDistance, float sceneMask) {
+    float distanceTint = smoothstep(6.0, 48.0, viewDistance) * sceneMask;
+    float overheadGlow = smoothstep(-0.25, 0.75, worldDir.y);
+    float tintAmount = mix(0.30, 0.46, distanceTint);
+    float lightAmount = (0.025 + overheadGlow * 0.055) * mix(0.65, 1.0, sceneMask);
+
+    color *= mix(vec3(1.0), UNDERWATER_TINT_COLOR, tintAmount);
+    color += UNDERWATER_LIGHT_COLOR * lightAmount;
 
     return color;
 }

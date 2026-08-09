@@ -18,8 +18,8 @@ varying float isWater;
 
 /* DRAWBUFFERS:023 */
 
-const float WATER_MIN_ALPHA = 0.42;
-const float WATER_MAX_ALPHA = 0.72;
+const float WATER_BASE_ALPHA = 0.70;
+const float WATER_FRESNEL_ALPHA_BOOST = 0.06;
 const float WATER_WAVE_NORMAL_STRENGTH = 0.11;
 
 float waterRipple(vec2 uv, float time) {
@@ -67,7 +67,7 @@ void main() {
     waterColor += skyReflection * (fresnel * 0.036 + specular * 0.026) * isWater * (1.0 - verticalWater * 0.72);
 
     vec3 outColor = mix(baseColor, waterColor, isWater);
-    float waterAlpha = clamp(max(albedo.a, WATER_MIN_ALPHA) + fresnel * 0.10, WATER_MIN_ALPHA, WATER_MAX_ALPHA);
+    float waterAlpha = WATER_BASE_ALPHA + fresnel * WATER_FRESNEL_ALPHA_BOOST;
     float outAlpha = mix(albedo.a, waterAlpha, isWater);
 
     gl_FragData[0] = vec4(outColor, outAlpha);

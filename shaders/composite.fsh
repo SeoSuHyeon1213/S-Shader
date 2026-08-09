@@ -14,6 +14,8 @@ uniform float viewHeight;
 const float BLOOM_KNEE      = 0.2;
 const float BLOOM_SPREAD    = 4.0; // texel multiplier
 const float BLOOM_CLAMP     = 8.0;
+const vec3 LAVA_BLOOM_COLOR = vec3(1.000, 0.227, 0.125);
+const float LAVA_BLOOM_STRENGTH = 1.35;
 
 float gaussianWeight(int offset) {
     if (offset == 0) return 0.4026;
@@ -23,9 +25,12 @@ float gaussianWeight(int offset) {
 
 vec3 brightPass(vec2 uv) {
     vec3 color = texture2D(colortex0, uv).rgb;
+    float lavaMask = texture2D(colortex2, uv).b;
     float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
     float contribution = smoothstep(BLOOM_THRESHOLD, BLOOM_THRESHOLD + BLOOM_KNEE, brightness);
-    return color * contribution;
+    vec3 sceneBloom = color * contribution;
+    vec3 lavaBloom = mix(color, LAVA_BLOOM_COLOR, 0.58) * lavaMask * LAVA_BLOOM_STRENGTH;
+    return max(sceneBloom, lavaBloom);
 }
 
 vec3 blurBloom(vec2 uv) {
