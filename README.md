@@ -1,5 +1,9 @@
 # S-Shader
 
+> NOT AN OFFICIAL MINECRAFT PRODUCT. NOT APPROVED BY OR ASSOCIATED WITH MOJANG OR MICROSOFT.
+
+S-Shader는 비공식 프로젝트이며, Mojang 또는 Microsoft의 승인이나 제휴를 받은 제품이 아닙니다.
+
 S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더팩입니다. 사실적인 렌더링을 완전히 재현하기보다는, 부드러운 색감, 안개, 하늘 색 통합, 젖은 표면, 횃불 조명, 그림자 대비를 통해 분위기 있는 화면을 만드는 것을 목표로 합니다.
 
 현재 개발은 Codex와 Claude Code를 함께 사용해 빠르게 실험하고 있으며, 실제 게임 플레이 스크린샷을 기준으로 색감과 효과를 계속 조정하고 있습니다.
@@ -178,4 +182,15 @@ NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 
 
 ## License
 
-MIT License. 자세한 내용은 `LICENSE` 파일을 참고하세요.
+S-Shader의 자체 제작 코드에는 MIT License가 적용됩니다. 자세한 내용은 [LICENSE](LICENSE) 파일을 참고하세요. 외부 코드나 에셋을 포함하는 경우 해당 저작권자의 라이선스와 고지도 별도로 준수해야 합니다.
+
+## Minecraft 정책 안내
+
+S-Shader의 코드 라이선스와 Minecraft의 이용 정책은 별개입니다. Minecraft와 관련된 이용·배포에는 [Minecraft EULA](https://www.minecraft.net/en-us/eula)와 [Minecraft Usage Guidelines](https://www.minecraft.net/en-us/usage-guidelines)를 확인하고 준수해야 합니다.
+
+- 셰이더팩만 배포하며, Minecraft 게임 파일이나 셰이더팩을 포함한 수정된 게임 클라이언트·서버를 함께 재배포하지 않습니다.
+- Minecraft의 이름·브랜드·에셋에 관한 권리는 Mojang 및 Microsoft에 있습니다. MIT License는 이들에 대한 사용 권한을 부여하지 않습니다.
+- 배포·소개 페이지에서도 비공식 프로젝트임을 표시하고, 공식 제품이나 승인된 프로젝트로 오인하게 하는 이름·로고·표현을 사용하지 않습니다.
+- MIT License의 상업적 이용 허용은 Minecraft 관련 판매·수익화를 승인한다는 뜻이 아닙니다. 판매나 수익화를 검토할 때는 적용되는 공식 정책과 허용 범위를 별도로 확인해야 합니다.
+
+이 안내는 MIT License에 추가 제한을 붙이거나 공식 정책을 대체하는 문서가 아닙니다. 정책은 변경될 수 있으므로 이용·배포 시 위 공식 링크의 최신 내용을 확인해야 하며, 안내 문구만으로 정책 준수가 보장되는 것은 아닙니다.
