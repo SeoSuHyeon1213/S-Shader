@@ -11,11 +11,13 @@ uniform float viewHeight;
 /* DRAWBUFFERS:0123 */
 
 #define BLOOM_THRESHOLD 0.8 // Bloom threshold [0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.4 1.6]
+#define LAVA_EMISSION_INTENSITY 1.0 // Lava emission strength [0.0 0.5 0.75 1.0 1.25 1.5 2.0]
 const float BLOOM_KNEE      = 0.2;
 const float BLOOM_SPREAD    = 4.0; // texel multiplier
 const float BLOOM_CLAMP     = 8.0;
 const vec3 LAVA_BLOOM_COLOR = vec3(1.000, 0.227, 0.125);
 const float LAVA_BLOOM_STRENGTH = 1.35;
+const float LAVA_GLOW_SPREAD = 18.0;
 
 float gaussianWeight(int offset) {
     if (offset == 0) return 0.4026;
@@ -29,7 +31,7 @@ vec3 brightPass(vec2 uv) {
     float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
     float contribution = smoothstep(BLOOM_THRESHOLD, BLOOM_THRESHOLD + BLOOM_KNEE, brightness);
     vec3 sceneBloom = color * contribution;
-    vec3 lavaBloom = mix(color, LAVA_BLOOM_COLOR, 0.58) * lavaMask * LAVA_BLOOM_STRENGTH;
+    vec3 lavaBloom = mix(color, LAVA_BLOOM_COLOR, 0.58) * lavaMask * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY;
     return max(sceneBloom, lavaBloom);
 }
 
@@ -46,6 +48,21 @@ vec3 blurBloom(vec2 uv) {
         }
     }
 
+    // A separate nine-tap halo widens only lava glow, keeping scene bloom sharp.
+    if (LAVA_EMISSION_INTENSITY > 0.0) {
+        for (int x = -1; x <= 1; x++) {
+            for (int y = -1; y <= 1; y++) {
+                vec2 sampleUv = uv + vec2(float(x), float(y)) * texel * LAVA_GLOW_SPREAD;
+                if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) continue;
+                float lavaMask = texture2D(colortex2, sampleUv).b;
+                vec3 lavaColor = texture2D(colortex0, sampleUv).rgb;
+                float weightX = x == 0 ? 0.5 : 0.25;
+                float weightY = y == 0 ? 0.5 : 0.25;
+                result += mix(lavaColor, LAVA_BLOOM_COLOR, 0.58) * lavaMask *
+                          weightX * weightY * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY * 0.65;
+            }
+        }
+    }
     return min(result, vec3(BLOOM_CLAMP));
 }
 

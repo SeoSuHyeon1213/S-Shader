@@ -52,6 +52,7 @@ const float HORIZON_FOG_PULL = 0.10; // Blends distant terrain into the shared s
 
 // ---- Bloom ----
 #define BLOOM_INTENSITY 0.16 // Bloom strength [0.0 0.05 0.1 0.15 0.16 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0]
+#define LAVA_EMISSION_INTENSITY 1.0 // Lava emission strength [0.0 0.5 0.75 1.0 1.25 1.5 2.0]
 
 // ---- Contact Shadows ----
 #define CONTACT_SHADOW_INTENSITY 0.65 // Near-field screen-space contact shadow strength [0.0 0.08 0.16 0.24 0.32 0.4 0.5 0.65 0.8]
@@ -127,7 +128,7 @@ void main() {
 #endif
 
     // Mood lighting
-    color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, shadowVisibility, lavaMask, frameTimeCounter, TORCH_LIGHT_INTENSITY, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
+    color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, shadowVisibility, frameTimeCounter, TORCH_LIGHT_INTENSITY, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
 
     // Darken rain-exposed textures before adding wet highlights and reflections.
     color = applyRainTextureDarkening(color, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength);
@@ -155,6 +156,8 @@ void main() {
 #if WATER_REFLECTION_MODE == 1
     color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, worldNormal, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, WATER_REFLECTION_INTENSITY);
 #endif
+
+    color = applyLavaEmission(color, sceneSample.rgb, lavaMask * sceneMask, LAVA_EMISSION_INTENSITY);
 
     // Fog
     float fogStartRatio = FOG_START * (1.0 - rainStrength * RAIN_FOG_PULL);

@@ -17,7 +17,8 @@ void main() {
     vec4 albedo = texture2D(texture, texCoord) * glColor;
     if (albedo.a < 0.1) discard;
 
-    albedo.rgb *= texture2D(lightmap, lmCoord).rgb;
+    // Lava is self-lit; preserve its texture even in dark interiors.
+    albedo.rgb *= mix(texture2D(lightmap, lmCoord).rgb, vec3(1.0), clamp(isLava, 0.0, 1.0));
 
     // Keep the scene color buffer opaque. Some Iris/composite paths can treat
     // colortex0 alpha as real transparency, so material masks live in colortex2.

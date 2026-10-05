@@ -13,7 +13,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - 비 오는 날 젖은 바닥, 벽면 물 흐름, 웅덩이 반사, wet specular 표현
 - 물 전용 `gbuffers_water`와 물 mask 기반 Fresnel/flow/rough reflection 표현
 - 횃불을 들었을 때 설치된 횃불과 비슷한 따뜻한 주황빛 조명
-- lava mask 기반 발광 보정
+- lava mask 기반 자체 발광과 용암 전용 넓은 bloom
 - shadow map 기반 PCF/PCSS 그림자, shadow tint, contact shadow
 - `colortex3` normal buffer 기반 지형 diffuse/form shadow 보정
 - hand/entity 전용 pass를 통한 들고 있는 아이템 반투명 문제 완화
@@ -46,6 +46,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `NIGHT_LIGHT_STRENGTH`
 - `SUNSET_GLOW_STRENGTH`
 - `TORCH_LIGHT_INTENSITY`
+- `LAVA_EMISSION_INTENSITY`: 용암 자체 발광과 전용 bloom 강도, 기본값 `1.0`
 - `CONTACT_SHADOW_INTENSITY`
 - `RAIN_REFLECTION_INTENSITY`
 - `BLOOM_INTENSITY`
@@ -123,6 +124,15 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - loader별 reflection/depth buffer 지원 여부 확인
 - 더 정확한 물 깊이 계산과 underwater absorption
 - SSR edge artifact 및 disocclusion 처리 고도화
+
+## Lava Emission
+
+용암은 lightmap 감쇠를 받지 않으며, 텍스처의 밝은 부분을 중심으로 자체 발광을 강화합니다. 최종 발광은 날씨·그림자 보정 이후, 안개·톤 매핑 이전에 적용됩니다.
+용암 마스크만 추출하는 추가 9-tap bloom으로 주황빛이 주변 화면에 퍼집니다. 실제 주변 블록에 대한 광원 추적이나 간접 조명은 구현하지 않습니다.
+
+- `LAVA_EMISSION_INTENSITY`는 `0.0`부터 `2.0`까지 조절합니다. `0.0`은 추가 자체 발광과 전용 bloom을 끄며, 용암의 기본 자체 조명과 일반 bloom은 유지됩니다.
+- `BLOOM_INTENSITY`는 용암을 포함한 전체 bloom의 최종 합성 강도입니다. `0.0`이면 빛 번짐만 꺼지고 용암 자체 발광은 유지됩니다.
+- 용암 전용 halo는 화면 픽셀 기준이며, 활성화 시 composite에 최대 18회의 texture sampling이 추가됩니다. 해상도·장면에 따른 시각 품질과 성능은 게임에서 확인해야 합니다.
 
 ## Crash / Stability Debug
 

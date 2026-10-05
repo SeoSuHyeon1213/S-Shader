@@ -116,6 +116,17 @@ vec3 applyUnderwaterLighting(vec3 color, vec3 worldDir, float viewDistance, floa
     return color;
 }
 
+vec3 applyLavaEmission(vec3 color, vec3 surfaceColor, float lavaMask, float intensity) {
+    float mask = clamp(lavaMask, 0.0, 1.0);
+    if (mask <= 0.001 || intensity <= 0.0) return color;
+
+    float hotCore = smoothstep(0.20, 0.85, getLuminance(surfaceColor));
+    vec3 emission = surfaceColor * (1.0 + intensity * (0.50 + hotCore * 0.60));
+    emission += mix(LAVA_LIGHT_COLOR, LAVA_EDGE_COLOR, hotCore) * intensity * 0.08;
+    // Restore emission after weather/shadow shading, before fog and tonemapping.
+    return mix(color, max(color, emission), mask);
+}
+
 
 vec3 getDirectionalLightVector(int worldTime) {
     float phase = mod(float(worldTime), 24000.0) / 24000.0;
@@ -197,7 +208,6 @@ vec3 applyMoodLighting(
     int heldBlockLightValue,
     int heldBlockLightValue2,
     float shadowVisibility,
-    float lavaMask,
     float frameTimeCounter,
     float torchIntensity,
     float dayLightStrength,
@@ -228,13 +238,11 @@ vec3 applyMoodLighting(
     vec3 shadowTint = mix(vec3(0.86, 0.92, 1.06), skyTint, 0.35 + nightMask * 0.25);
     vec3 highlightTint = mix(moonColor, sunColor, sunIntensity * 0.85 + 0.15);
     vec3 rainReflectTint = mix(vec3(0.85, 0.90, 1.0), RAIN_ACCENT_COLOR, 0.18);
-    vec3 lavaSpill = mix(LAVA_EDGE_COLOR, LAVA_LIGHT_COLOR, 0.45);
 
     color = mix(color, color * shadowTint, ambientShadowMask * strength * 0.28);
     color = mix(color, color * highlightTint, highlightMask * strength * (0.25 + sunGlow * 0.15 * sunsetGlowStrength) * weatherDampen * (1.0 - castShadowMask * 0.42));
     float heldTorchStrength = mix(0.82, 1.0, clamp(strength, 0.0, 1.0));
     color = applyHeldTorchLight(color, heldLightMask, heldTorchStrength, torchIntensity, torchFlicker);
-    color = mix(color, color * lavaSpill + LAVA_LIGHT_COLOR * 0.14, lavaMask * strength * 0.45);
     color += highlightMask * rain * strength * rainReflectTint * 0.06;
     color = mix(color, color * RAIN_AMBIENT_COLOR, rain * strength * 0.07);
     color = mix(color, vec3(getLuminance(color)), rain * strength * 0.10);
