@@ -7,6 +7,7 @@ uniform sampler2D colortex1; // blurred bloom buffer (from composite)
 uniform sampler2D colortex2; // terrain wet/wall/lava/water masks
 uniform sampler2D colortex3; // encoded world normals
 uniform sampler2D depthtex0; // scene depth
+uniform sampler2D depthtex1; // opaque bottom behind translucent water
 uniform sampler2D shadowtex0; // sun/moon shadow map
 
 uniform float near;
@@ -29,6 +30,7 @@ uniform mat4 shadowProjection;
 #include "/lib/shadows.glsl"
 #include "/lib/contact_shadows.glsl"
 #include "/lib/lighting.glsl"
+#include "/lib/water_depth.glsl"
 #include "/lib/wet.glsl"
 #include "/lib/ssr.glsl"
 
@@ -110,14 +112,26 @@ void main() {
     vec3 viewPos = getViewPosition(texCoord, depth);
     vec3 worldPos = getWorldPosition(viewPos);
     vec3 worldDir = getWorldDirection(viewPos);
+    float waterDepthFactor = 0.0;
+    float waterReflectionIntensity = WATER_REFLECTION_INTENSITY;
+    float verticalWaterMask = smoothstep(0.30, 0.86, 1.0 - abs(worldNormal.y));
+    if (waterMask > 0.001 && isEyeInWater == 0 && verticalWaterMask < 0.5) {
+        float waterColumnDepth = getWaterColumnDepth(depthtex1, texCoord, viewPos, gbufferProjectionInverse, gbufferModelViewInverse);
+        waterDepthFactor = getWaterDepthFactor(waterColumnDepth);
+        waterReflectionIntensity = clamp(WATER_REFLECTION_INTENSITY * getWaterReflectionScale(waterDepthFactor), 0.0, 1.0);
+    }
     vec3 skyReflectionColor = getSkyWaterReflectionColor(worldDir, worldTime, rainStrength);
     vec3 waterReflectionDir = normalize(reflect(worldDir, worldNormal));
     vec3 waterReflectionColor = getSkyWaterReflectionColor(waterReflectionDir, worldTime, rainStrength);
     float sceneMask = 1.0 - step(1.0, depth);
-    float terrainReceiverMask = clamp(max(max(terrainWetMask, terrainWallMask), max(lavaMask, waterMask)), 0.0, 1.0);
+    // Material response is not receiver opacity: even low-wetness terrain receives shadows.
+    float terrainReceiverMask = step(0.001, max(max(terrainWetMask, terrainWallMask), max(lavaMask, waterMask)));
     float terrainSceneMask = sceneMask * terrainReceiverMask;
-    float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldTime, rainStrength);
-    float rainExposure = getRainExposure(worldPos, dist, far, terrainSceneMask);
+    float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask, worldTime, rainStrength);
+    float rainExposure = 1.0;
+    if (rainStrength > 0.001) {
+        rainExposure = getRainExposure(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask);
+    }
     float surfaceRainStrength = rainStrength * rainExposure;
     color = applyShadow(color, shadowVisibility, terrainSceneMask, worldTime, rainStrength, terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask);
 #if ENABLE_CONTACT_SHADOWS == 1
@@ -147,14 +161,14 @@ void main() {
     color = applyWetSpecularBRDF(color, worldDir, depth, sceneMask, terrainWetMask, terrainWallMask, worldNormal, normalMask, surfaceRainStrength, worldTime, RAIN_REFLECTION_INTENSITY);
 #endif
 #if ENABLE_WATER_SURFACE == 1
-    float stableWaterReflectionIntensity = WATER_REFLECTION_INTENSITY;
+    float stableWaterReflectionIntensity = waterReflectionIntensity;
 #if WATER_REFLECTION_MODE == 1
     stableWaterReflectionIntensity = 0.0;
 #endif
-    color = applyWaterSurface(color, colortex0, texCoord, sceneMask, waterMask, worldNormal, worldDir, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, stableWaterReflectionIntensity);
+    color = applyWaterSurface(color, colortex0, texCoord, sceneMask, waterMask, worldNormal, worldDir, dist, waterDepthFactor, waterReflectionColor, surfaceRainStrength, frameTimeCounter, stableWaterReflectionIntensity);
 #endif
 #if WATER_REFLECTION_MODE == 1
-    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, worldNormal, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, WATER_REFLECTION_INTENSITY);
+    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, worldNormal, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, waterReflectionIntensity);
 #endif
 
     color = applyLavaEmission(color, sceneSample.rgb, lavaMask * sceneMask, LAVA_EMISSION_INTENSITY);

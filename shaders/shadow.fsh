@@ -1,5 +1,7 @@
 #version 120
 
+#include "/lib/shadow_settings.glsl"
+
 uniform sampler2D texture;
 
 varying vec2 texCoord;

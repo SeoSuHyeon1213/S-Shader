@@ -2,10 +2,15 @@
 
 uniform sampler2D texture;
 uniform sampler2D lightmap;
+uniform sampler2D depthtex1; // opaque scene copied before translucent water
+uniform float viewWidth;
+uniform float viewHeight;
+uniform int isEyeInWater;
 uniform float frameTimeCounter;
 uniform float rainStrength;
 uniform int worldTime;
 uniform mat4 gbufferModelViewInverse;
+uniform mat4 gbufferProjectionInverse;
 
 varying vec2 texCoord;
 varying vec2 lmCoord;
@@ -15,10 +20,10 @@ varying vec3 viewDir;
 varying float isWater;
 
 #include "/lib/sky.glsl"
+#include "/lib/water_depth.glsl"
 
 /* DRAWBUFFERS:023 */
 
-const float WATER_BASE_ALPHA = 0.70;
 const float WATER_FRESNEL_ALPHA_BOOST = 0.06;
 const float WATER_WAVE_NORMAL_STRENGTH = 0.11;
 
@@ -51,7 +56,7 @@ void main() {
     float ripple = waterRipple(texCoord, frameTimeCounter) * isWater;
     vec3 waterNormal = getWaterWaveNormal(texCoord, frameTimeCounter, normalize(viewNormal));
     vec3 worldWaterNormal = normalize((gbufferModelViewInverse * vec4(waterNormal, 0.0)).xyz);
-    float facing = clamp(abs(waterNormal.z), 0.0, 1.0);
+    float facing = clamp(abs(dot(waterNormal, normalize(-viewDir))), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 2.0) * isWater;
     float specular = getWaterSpecular(waterNormal, ripple) * isWater;
     vec3 worldDir = normalize((gbufferModelViewInverse * vec4(normalize(viewDir), 0.0)).xyz);
@@ -67,7 +72,14 @@ void main() {
     waterColor += skyReflection * (fresnel * 0.036 + specular * 0.026) * isWater * (1.0 - verticalWater * 0.72);
 
     vec3 outColor = mix(baseColor, waterColor, isWater);
-    float waterAlpha = WATER_BASE_ALPHA + fresnel * WATER_FRESNEL_ALPHA_BOOST;
+    float baseAlpha = WATER_FALLBACK_ALPHA;
+    if (isWater > 0.5 && isEyeInWater == 0 && verticalWater < 0.5) {
+        vec2 screenUv = gl_FragCoord.xy / vec2(viewWidth, viewHeight);
+        float columnDepth = getWaterColumnDepth(depthtex1, screenUv, viewDir, gbufferProjectionInverse, gbufferModelViewInverse);
+        float depthFactor = getWaterDepthFactor(columnDepth);
+        baseAlpha = mix(WATER_SHALLOW_ALPHA, WATER_DEEP_ALPHA, depthFactor);
+    }
+    float waterAlpha = clamp(baseAlpha + fresnel * WATER_FRESNEL_ALPHA_BOOST, 0.0, 1.0);
     float outAlpha = mix(albedo.a, waterAlpha, isWater);
 
     gl_FragData[0] = vec4(outColor, outAlpha);

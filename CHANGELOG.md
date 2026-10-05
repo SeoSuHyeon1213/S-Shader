@@ -4,6 +4,48 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-05 - Depth-Based Water Transparency and Reflections
+
+### Changed
+
+- Added a shared water depth helper using vertical separation between the water surface and opaque depthtex1 geometry, with a deep-water fallback when no bottom is visible.
+- Blend base alpha from 0.35 at up to 2 blocks to 0.70 at 12 blocks and deeper; retain a 0.06 Fresnel alpha boost.
+- Scale stable and SSR reflection strength from 0.25 to 0.60 at the existing 0.60 master setting, and use the same depth response for water absorption instead of camera distance.
+- Use alpha 0.45 for vertical water and underwater views; calculate Fresnel from the actual surface-to-camera direction.
+- Disable blending for the water pass material and normal buffers while retaining color alpha blending.
+
+### Test Notes
+
+- Numerical flat-bottom reconstruction and static shader interface checks passed. In-game compilation, sloping/occluded-bottom scenes, underwater/vertical water and performance remain unverified.
+
+## 2026-10-05 - Shadow Fragmentation and Sampling Corrections
+
+### Fixed
+
+- Moved shadow resolution/distance/snapping from unsupported bare properties into shared GLSL loader constants, matching the 2048 map resolution to the texel size used by filters.
+- Separated terrain receiver presence from wet-material response so low-response soil/wood/wall surfaces no longer bypass shadow visibility at a 0.5 threshold.
+- Replaced screen-derivative depth bias with bounded world-normal/light-direction bias scaled by the shadow projection and texel size.
+- Enabled nearest raw depth sampling and bilinearly interpolated per-texel comparison results instead of comparing interpolated depths across discontinuities.
+- Made fixed-radius PCF the default; optional PCSS falls back to PCF when its sparse blocker search misses an occluder.
+- Skip rain-exposure sampling in dry weather to offset the cost of manual comparison filtering.
+
+### Test Notes
+
+- Persisted `SHADOW_MODE = 1` overrides the new default; select `0` for the stable comparison. In-game compilation, screenshots and performance checks remain pending.
+
+## 2026-10-05 - Sun-Driven Shadow Stability and Darker Shading
+
+### Changed
+
+- Removed player-distance split attenuation and distance-dependent PCSS filter radius. Penumbra still follows light-space blocker/receiver separation.
+- Matched terrain form lighting and shadow sky tint to the actual shadowModelView light direction instead of an approximate time-based orbit.
+- Removed view-angle attenuation from terrain form shadows; specular highlights retain their view dependence.
+- Increased shadow darkness from 0.86 to 0.94 and multiplied the shadow tint target by 0.62, retaining dark-surface protection.
+
+### Test Notes
+
+- Shader compilation and in-game movement/time comparisons remain pending. Single-map reprojection, edge fade and fog can still change distant shadow appearance.
+
 ## 2026-06-21 - Shadow Distance Split Stabilization
 
 ### Changed

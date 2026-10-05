@@ -30,7 +30,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 옵션은 Iris/NeOculus 셰이더 옵션 화면에 직접 노출됩니다.
 
-- `SHADOW_MODE`: `0` = Poisson PCF, `1` = PCSS
+- `SHADOW_MODE`: `0` = 고정 반경 Poisson PCF (기본값), `1` = 실험적 PCSS
 - `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사, `1` = 약한 SSR 추가
 - `ENABLE_CONTACT_SHADOWS`: 가까운 거리 screen-space contact shadow on/off
 - `ENABLE_NORMAL_FORM_LIGHTING`: normal buffer 기반 지형 입체 조명 on/off
@@ -86,6 +86,10 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `shadowMapResolution = 2048`
 - `shadowDistance = 96.0`
 - `shadowIntervalSize = 8.0`
+- 위 세 설정은 `lib/shadow_settings.glsl`의 GLSL 상수로 선언하고 shadow/final 패스에서 공유
+- nearest 깊이 샘플을 비교한 뒤 결과를 bilinear 보간해 깊이 경계의 가짜 표면과 텍셀 단위 튐 완화
+- 화면 미분 대신 world normal과 실제 광원 방향·투영 크기로 제한된 slope bias 계산
+- 낮은 wet response 재질도 그림자를 받도록 receiver 존재 여부와 wet response 강도 분리
 - shadow tint와 rain/weather fade
 - screen-space contact shadow
 - normal buffer 기반 terrain form lighting
@@ -96,6 +100,13 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `ENABLE_CONTACT_SHADOWS = 0` 기본값으로 screen-space 그림자 이동감 최소화
 - texture-coordinate 기반 partial caster dither로 shadow reprojection crawling 완화
 - terrain-only PCSS penumbra 기반 soft shadow 표현력 복구
+- 플레이어 거리별 필터 반경·농도 보정을 제거하고 광원 공간의 blocker/receiver 간격으로 PCSS 반경 계산
+- 실제 shadowModelView 광원 방향으로 표면 음영과 sky tint 계산, 시선 각도에 따른 form shadow 감쇠 제거
+- 그림자 강도 0.94와 tint 밝기 배율 0.62로 그림자 명도 감소, 어두운 재질 보호 유지
+
+단일 shadow map의 재투영·해상도 한계와 맵 가장자리 fade는 남아 있습니다. 이동 중 모든 경계 변화가 제거된 것은 아니며, 변경의 시각 품질은 게임에서 확인해야 합니다. 기존 옵션 파일에 `SHADOW_MODE = 1`이 저장되어 있다면 안정성 비교 시 `0`으로 바꿉니다.
+
+깊이 비교 보간은 PCF 필터당 최대 36회, 비 노출 판정당 최대 24회의 깊이 읽기를 사용합니다. 비 노출 판정은 비가 올 때만 실행합니다. PCSS 선택 시 blocker 탐색 8회가 추가됩니다. 실제 GPU 비용과 FPS는 게임에서 확인해야 합니다.
 
 남은 작업:
 
@@ -115,15 +126,31 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `WATER_REFLECTION_MODE = 1`에서 water SSR 추가
 - 20-step SSR ray march와 6-step binary refinement
 - 9-tap roughness blur 기반 SSR reflection filtering
-- view-distance 기반 물 depth/absorption 근사
+- 물 표면과 depthtex1 불투명 바닥의 world-space 높이 차이에 기반한 수심별 alpha/반사/색 흡수
 - 폭포/수직 물기둥의 flow/absorption 중심 표현
 
 남은 작업:
 
 - 별도 reflected scene texture 기반 진짜 planar reflection
 - loader별 reflection/depth buffer 지원 여부 확인
-- 더 정확한 물 깊이 계산과 underwater absorption
+- 해안 절벽·바닥 미노출 상황의 수심 근사 개선과 underwater absorption
 - SSR edge artifact 및 disocclusion 처리 고도화
+
+### Shallow / Deep Water
+
+수평 수면을 물 밖에서 볼 때 얕은 물은 바닥이 잘 보이도록, 깊은 물은 물 색과 반사가 강하게 보이도록 설정합니다. 기본값은 다음과 같습니다.
+
+| 추정 수심 | 기본 alpha (불투명도) | 반사 강도 입력값 |
+|---|---|---|
+| 2블록 이하 | 0.35 | 0.25 |
+| 2~12블록 | smoothstep 보간 | smoothstep 보간 |
+| 12블록 이상 | 0.70 | 0.60 |
+
+값은 `shaders/lib/water_depth.glsl`에 모았습니다. `WATER_REFLECTION_INTENSITY = 0.6`일 때 표의 반사 입력값을 사용하며, 기존 옵션을 바꾸면 얕은 물과 깊은 물의 강도가 함께 조절됩니다. 최종 반사율은 Fresnel과 수면 방향 등의 감쇠를 거칩니다. alpha에는 시선 각도에 따라 최대 0.06이 추가됩니다.
+
+수심은 같은 화면 픽셀의 물 표면과 불투명 바닥을 복원한 뒤 수직 높이 차이로 추정합니다. 카메라와 물의 거리를 수심으로 사용하지 않습니다. 강/바다 바이옴을 판별하는 기능은 아니며, 깊은 강도 깊은 물로 표현합니다. 바닥이 렌더 거리 밖이거나 미노출이면 깊은 물로 처리합니다. 시선이 해안 절벽이나 물 밖의 지형을 가리키는 경우 정확한 수직 수심과 다를 수 있습니다.
+
+폭포와 물속 시점은 수평 수면용 수심 보간을 생략하고 alpha 0.45를 사용합니다. 물의 추가 깊이 읽기는 수심 계산이 필요한 픽셀에서 gbuffers_water와 final에 각각 1회입니다. 데이터 버퍼의 blending을 끄므로 물 alpha가 작아져도 water mask와 normal이 바닥 데이터와 섞이지 않습니다. 게임 컴파일·시각 비교·FPS 검증은 아직 필요합니다.
 
 ## Lava Emission
 

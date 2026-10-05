@@ -12,7 +12,6 @@ const float WET_TERRAIN_REFLECTION_STRENGTH = 1.0;
 const float WET_TERRAIN_REFLECTION_OFFSET = 0.026;
 const float WET_TEXTURE_DARKEN_STRENGTH = 0.25;
 const float WATER_PLANAR_FALLBACK_STRENGTH = 0.18;
-const float WATER_ABSORPTION_DISTANCE = 42.0;
 
 vec3 applyGlobalWetHighlight(
     vec3 color,
@@ -398,9 +397,9 @@ vec3 sampleWaterPlanarFallback(sampler2D sceneTexture, vec2 uv, vec3 worldDir, f
     return reflection;
 }
 
-vec3 applyWaterDepthAbsorption(vec3 color, vec3 waterTint, float viewDistance, float verticalWater, float flow, float mask) {
+vec3 applyWaterDepthAbsorption(vec3 color, vec3 waterTint, float depthFactor, float verticalWater, float flow, float mask) {
     float horizontalWater = 1.0 - verticalWater;
-    float depthAmount = smoothstep(3.0, WATER_ABSORPTION_DISTANCE, viewDistance) * horizontalWater;
+    float depthAmount = depthFactor * horizontalWater;
     float flowFoam = smoothstep(0.62, 1.0, flow) * verticalWater;
     vec3 shallowTint = vec3(0.50, 0.72, 0.92);
     vec3 deepTint = mix(vec3(0.035, 0.090, 0.160), waterTint, 0.35);
@@ -420,6 +419,7 @@ vec3 applyWaterSurface(
     vec3 worldNormal,
     vec3 worldDir,
     float viewDistance,
+    float depthFactor,
     vec3 skyReflectionColor,
     float rainStrength,
     float frameTimeCounter,
@@ -450,7 +450,7 @@ vec3 applyWaterSurface(
     float planarLuma = smoothstep(0.10, 0.90, getLuminance(planarFallback));
 
     color = mix(color, color * vec3(0.86, 0.95, 1.06), mask * 0.18 * horizontalWater);
-    color = applyWaterDepthAbsorption(color, waterTint, viewDistance, verticalWater, flow, mask);
+    color = applyWaterDepthAbsorption(color, waterTint, depthFactor, verticalWater, flow, mask);
     color = mix(color, mix(color * deepWaterTint, color * vec3(0.55, 0.72, 0.95), 0.38 + flow * 0.18), mask * waterfallMask * 0.34);
     vec3 stableReflection = mix(roughReflection, planarFallback * vec3(0.58, 0.76, 0.96), planarLuma * WATER_PLANAR_FALLBACK_STRENGTH * horizontalWater);
     vec3 skyMatchedReflection = mix(stableReflection, skyReflectionColor, fresnel * 0.42 + waterfallMask * 0.24);

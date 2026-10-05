@@ -128,14 +128,6 @@ vec3 applyLavaEmission(vec3 color, vec3 surfaceColor, float lavaMask, float inte
 }
 
 
-vec3 getDirectionalLightVector(int worldTime) {
-    float phase = mod(float(worldTime), 24000.0) / 24000.0;
-    float angle = (phase - 0.25) * 6.2831853;
-    vec3 sunDir = normalize(vec3(-sin(angle), max(cos(angle), 0.08), 0.28));
-    vec3 moonDir = normalize(vec3(sin(angle), max(-cos(angle), 0.08), -0.22));
-    return normalize(mix(moonDir, sunDir, skyDayMask(worldTime)));
-}
-
 vec3 getApproxTerrainNormal(float floorMask, float wallMask) {
     vec3 floorNormal = vec3(0.0, 1.0, 0.0);
     vec3 wallNormal = normalize(vec3(0.0, 0.22, 1.0));
@@ -161,7 +153,7 @@ vec3 applyTerrainFormLighting(
 
     vec3 fallbackNormal = getApproxTerrainNormal(floorMask, wallMask);
     vec3 normal = normalize(mix(fallbackNormal, worldNormal, clamp(normalMask, 0.0, 1.0)));
-    vec3 lightDir = getDirectionalLightVector(worldTime);
+    vec3 lightDir = getShadowLightDirection();
     float dayMask = skyDayMask(worldTime);
     float twilight = skyTwilightMask(worldTime);
     float rain = clamp(rainStrength, 0.0, 1.0);
@@ -170,11 +162,9 @@ vec3 applyTerrainFormLighting(
     float noL = clamp(dot(normal, lightDir), 0.0, 1.0);
     vec3 viewDir = normalize(-worldDir);
     vec3 halfDir = normalize(lightDir + viewDir);
-    float noV = clamp(dot(normal, viewDir), 0.0, 1.0);
     float noH = clamp(dot(normal, halfDir), 0.0, 1.0);
     float diffuse = noL * noL * (3.0 - 2.0 * noL);
     float backFace = pow(1.0 - noL, 1.35);
-    float grazing = pow(1.0 - noV, 2.0);
     float shadowMask = 1.0 - visibility;
     float normalConfidence = clamp(normalMask, 0.0, 1.0);
     float wallAmount = clamp(wallMask / max(floorMask + wallMask, 0.001), 0.0, 1.0);
@@ -182,14 +172,13 @@ vec3 applyTerrainFormLighting(
 
     vec3 directLight = mix(MOON_LIGHT_COLOR * 0.34, SUN_LIGHT_COLOR, dayMask);
     directLight = mix(directLight, SUN_HORIZON_COLOR, twilight * 0.24);
-    vec3 skyShade = getSkyShadowTint(getStableShadowSkyDirection(worldTime), worldTime, rainStrength);
+    vec3 skyShade = getSkyShadowTint(getStableShadowSkyDirection(), worldTime, rainStrength);
     vec3 normalShade = mix(vec3(0.52, 0.59, 0.74), skyShade, 0.50);
 
     float diffuseAmount = diffuse * visibility * terrainMask * normalConfidence * mix(0.045, 0.125, dayMask) * (1.0 - rain * 0.35);
     float brdfLobe = pow(noH, mix(26.0, 72.0, 1.0 - wallAmount)) * noL * visibility;
     float brdfAmount = brdfLobe * terrainMask * normalConfidence * wetAmount * mix(0.010, 0.035, dayMask) * (1.0 - rain * 0.18);
     float formShadow = backFace * terrainMask * normalConfidence * mix(0.095, 0.130, dayMask);
-    formShadow *= mix(1.0, 0.78, wetAmount * grazing);
     float castShadow = shadowMask * terrainMask * normalConfidence * mix(0.130, 0.160, dayMask);
     float combinedShadow = clamp(formShadow + castShadow + formShadow * castShadow * 0.8, 0.0, 0.52);
 

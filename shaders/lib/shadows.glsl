@@ -1,18 +1,16 @@
 // Shadow mapping utilities
 
-#define SHADOW_MODE 1 // Shadow filter mode: 0 = Poisson PCF, 1 = PCSS blocker search [0 1]
+#include "/lib/shadow_settings.glsl"
 
-const float SHADOW_DARKNESS = 0.86;
+#define SHADOW_MODE 0 // Shadow filter mode: 0 = stable Poisson PCF, 1 = experimental PCSS [0 1]
+
+const float SHADOW_DARKNESS = 0.94;
 const float SHADOW_FADE_START = 0.58;
-const float SHADOW_BIAS = 0.0012;
-const float SHADOW_SLOPE_BIAS = 2.4;
+const float SHADOW_BIAS_TEXELS = 0.6;
+const float SHADOW_SLOPE_BIAS_TEXELS = 2.4;
+const float SHADOW_MAX_SLOPE = 1.5;
 const float SHADOW_DISTANCE_BIAS = 0.0015;
 const float SHADOW_EDGE_FADE = 0.045;
-const float SHADOW_TEXEL_SIZE = 1.0 / 2048.0;
-const float SHADOW_NEAR_SPLIT_END = 0.22;
-const float SHADOW_MID_SPLIT_END = 0.52;
-const float SHADOW_FAR_SPLIT_START = 0.52;
-const float SHADOW_FAR_SPLIT_END = 0.86;
 const float SHADOW_STABLE_PCF_RADIUS = 0.95;
 const float SHADOW_STABLE_PCSS_SEARCH_RADIUS = 1.45;
 
@@ -38,14 +36,35 @@ float getShadowDayFactor(int worldTime) {
     return max(dayMask, (1.0 - dayMask) * 0.42);
 }
 
-float getShadowBias(vec3 shadowPos, float viewDistance, float farPlane) {
-    float receiverSlope = max(abs(dFdx(shadowPos.z)), abs(dFdy(shadowPos.z)));
-    return SHADOW_BIAS + receiverSlope * SHADOW_SLOPE_BIAS;
+vec3 getShadowLightDirection() {
+    // The light-view Z row points toward the sun/moon in world space.
+    return normalize(vec3(shadowModelView[0].z, shadowModelView[1].z, shadowModelView[2].z));
+}
+
+float getShadowBias(vec3 worldNormal, float normalMask) {
+    float noL = clamp(abs(dot(worldNormal, getShadowLightDirection())), 0.0, 1.0);
+    float slope = sqrt(max(1.0 - noL * noL, 0.0)) / max(noL, 0.2);
+    slope = mix(1.0, min(slope, SHADOW_MAX_SLOPE), clamp(normalMask, 0.0, 1.0));
+    float worldTexelSize = 2.0 * SHADOW_TEXEL_SIZE / max(abs(shadowProjection[0].x), 0.00001);
+    float depthPerTexel = worldTexelSize * abs(shadowProjection[2].z) * 0.5;
+    // Bound the light-space slope bias; screen derivatives jump across geometry edges.
+    return depthPerTexel * (SHADOW_BIAS_TEXELS + slope * SHADOW_SLOPE_BIAS_TEXELS);
 }
 
 float sampleShadowMap(vec3 shadowPos, vec2 offset, float bias) {
-    float shadowDepth = texture2D(shadowtex0, shadowPos.xy + offset * SHADOW_TEXEL_SIZE).r;
-    return step(shadowPos.z - bias, shadowDepth);
+    vec2 sampleUv = shadowPos.xy + offset * SHADOW_TEXEL_SIZE;
+    vec2 texelPos = sampleUv / SHADOW_TEXEL_SIZE - 0.5;
+    vec2 fraction = fract(texelPos);
+    vec2 baseUv = (floor(texelPos) + 0.5) * SHADOW_TEXEL_SIZE;
+    vec2 minUv = vec2(SHADOW_TEXEL_SIZE * 0.5);
+    vec2 maxUv = vec2(1.0) - minUv;
+    float receiverDepth = shadowPos.z - bias;
+    // Compare nearest depths first, then interpolate visibility, never raw depth.
+    float s00 = step(receiverDepth, texture2D(shadowtex0, clamp(baseUv, minUv, maxUv)).r);
+    float s10 = step(receiverDepth, texture2D(shadowtex0, clamp(baseUv + vec2(SHADOW_TEXEL_SIZE, 0.0), minUv, maxUv)).r);
+    float s01 = step(receiverDepth, texture2D(shadowtex0, clamp(baseUv + vec2(0.0, SHADOW_TEXEL_SIZE), minUv, maxUv)).r);
+    float s11 = step(receiverDepth, texture2D(shadowtex0, clamp(baseUv + vec2(SHADOW_TEXEL_SIZE), minUv, maxUv)).r);
+    return mix(mix(s00, s10, fraction.x), mix(s01, s11, fraction.x), fraction.y);
 }
 
 
@@ -116,24 +135,21 @@ float getPCSSPenumbraRadius(float receiverDepth, float blockerDepth) {
     return clamp(depthDelta * PCSS_LIGHT_SIZE, PCSS_MIN_RADIUS, PCSS_MAX_RADIUS);
 }
 
-float getShadowStableFilterRadius(float viewDistance, float farPlane, float dynamicRadius) {
-    float distanceRatio = clamp(viewDistance / max(farPlane, 0.001), 0.0, 1.0);
-    float midBand = smoothstep(SHADOW_NEAR_SPLIT_END, SHADOW_MID_SPLIT_END, distanceRatio);
-    float farBand = smoothstep(SHADOW_FAR_SPLIT_START, SHADOW_FAR_SPLIT_END, distanceRatio);
-
-    float stableRadius = mix(SHADOW_STABLE_PCF_RADIUS, dynamicRadius, 0.82);
-    stableRadius = mix(stableRadius, max(SHADOW_STABLE_PCF_RADIUS, stableRadius * 0.82), midBand * 0.35);
-    return mix(stableRadius, SHADOW_STABLE_PCF_RADIUS * 1.18, farBand);
+float getShadowStableFilterRadius(float dynamicRadius) {
+    // Penumbra follows light-space blocker separation, not player distance.
+    return mix(SHADOW_STABLE_PCF_RADIUS, dynamicRadius, 0.82);
 }
 
-float samplePCSSShadow(vec3 shadowPos, float bias, float viewDistance, float farPlane) {
+float samplePCSSShadow(vec3 shadowPos, float bias) {
     float searchRadius = SHADOW_STABLE_PCSS_SEARCH_RADIUS;
     float blockerDepth = findAverageBlockerDepth(shadowPos, bias, searchRadius);
 
-    if (blockerDepth < 0.0) return 1.0;
+    if (blockerDepth < 0.0) {
+        return samplePoissonShadow(shadowPos, bias, SHADOW_STABLE_PCF_RADIUS, SHADOW_PCF_SAMPLES);
+    }
 
     float penumbraRadius = getPCSSPenumbraRadius(shadowPos.z, blockerDepth);
-    float filterRadius = getShadowStableFilterRadius(viewDistance, farPlane, penumbraRadius);
+    float filterRadius = getShadowStableFilterRadius(penumbraRadius);
 
     return samplePoissonShadow(shadowPos, bias, filterRadius, PCSS_FILTER_SAMPLES);
 }
@@ -143,23 +159,13 @@ float getShadowEdgeFade(vec3 shadowPos) {
     return smoothstep(0.0, SHADOW_EDGE_FADE, edgeDist);
 }
 
-float getShadowDistanceSplitFade(float viewDistance, float farPlane) {
-    float distanceRatio = clamp(viewDistance / max(farPlane, 0.001), 0.0, 1.0);
-    float nearBand = 1.0 - smoothstep(SHADOW_NEAR_SPLIT_END * 0.72, SHADOW_NEAR_SPLIT_END, distanceRatio);
-    float midBand = smoothstep(SHADOW_NEAR_SPLIT_END * 0.82, SHADOW_MID_SPLIT_END, distanceRatio);
-    float farBand = smoothstep(SHADOW_FAR_SPLIT_START, SHADOW_FAR_SPLIT_END, distanceRatio);
-
-    // Single shadow map distance split: keep near shadows assertive, then fade far shadows into sky/fog tint.
-    float midStrength = mix(1.0, 0.86, midBand);
-    float farStrength = mix(midStrength, 0.46, farBand);
-    return mix(farStrength, 1.0, nearBand * 0.18);
-}
-
 float getShadowVisibility(
     vec3 worldPos,
     float viewDistance,
     float farPlane,
     float sceneMask,
+    vec3 worldNormal,
+    float normalMask,
     int worldTime,
     float rainStrength
 ) {
@@ -175,19 +181,18 @@ float getShadowVisibility(
         return 1.0;
     }
 
-    float bias = getShadowBias(shadowPos, viewDistance, farPlane);
+    float bias = getShadowBias(worldNormal, normalMask);
     float visibility = 1.0;
 #if SHADOW_MODE == 1
-    visibility = samplePCSSShadow(shadowPos, bias, viewDistance, farPlane);
+    visibility = samplePCSSShadow(shadowPos, bias);
 #else
     visibility = samplePoissonShadow(shadowPos, bias, SHADOW_STABLE_PCF_RADIUS, SHADOW_PCF_SAMPLES);
 #endif
 
     float edgeFade = getShadowEdgeFade(shadowPos);
-    float splitFade = getShadowDistanceSplitFade(viewDistance, farPlane);
     float weatherFade = 1.0 - clamp(rainStrength, 0.0, 1.0) * 0.55;
     float timeFade = getShadowDayFactor(worldTime);
-    float shadowStrength = edgeFade * splitFade * weatherFade * timeFade;
+    float shadowStrength = edgeFade * weatherFade * timeFade;
 
     return mix(1.0, visibility, shadowStrength);
 }
@@ -196,7 +201,9 @@ float getRainExposure(
     vec3 worldPos,
     float viewDistance,
     float farPlane,
-    float sceneMask
+    float sceneMask,
+    vec3 worldNormal,
+    float normalMask
 ) {
     if (sceneMask < 0.5) return 1.0;
 
@@ -210,7 +217,7 @@ float getRainExposure(
         return 1.0;
     }
 
-    float bias = getShadowBias(shadowPos, viewDistance, farPlane) * 1.35;
+    float bias = getShadowBias(worldNormal, normalMask) * 1.35;
     float visibility = samplePoissonShadow(shadowPos, bias, SHADOW_POISSON_NEAR_RADIUS, 5);
 
     float distanceFade = 1.0 - smoothstep(farPlane * 0.62, farPlane, viewDistance);
@@ -220,13 +227,8 @@ float getRainExposure(
     return mix(1.0, clamp(exposure, RAIN_EXPOSURE_MIN, 1.0), distanceFade * edgeFade);
 }
 
-vec3 getStableShadowSkyDirection(int worldTime) {
-    float phase = mod(float(worldTime), 24000.0) / 24000.0;
-    float angle = (phase - 0.25) * 6.2831853;
-    vec3 sunDir = normalize(vec3(-sin(angle), max(cos(angle), 0.08), 0.28));
-    vec3 moonDir = normalize(vec3(sin(angle), max(-cos(angle), 0.08), -0.22));
-    vec3 lightDir = normalize(mix(moonDir, sunDir, skyDayMask(worldTime)));
-    return normalize(mix(vec3(0.0, 1.0, 0.0), lightDir, 0.38));
+vec3 getStableShadowSkyDirection() {
+    return normalize(mix(vec3(0.0, 1.0, 0.0), getShadowLightDirection(), 0.85));
 }
 
 vec3 getSkyShadowTint(vec3 worldDir, int worldTime, float rainStrength) {
@@ -320,7 +322,7 @@ vec3 applyShadow(
     float darkSurfaceProtection = mix(0.48, 1.0, smoothstep(0.035, 0.34, luma));
     float materialStrength = getMaterialShadowStrength(sceneMask, terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask);
     float shadowAmount = (1.0 - visibility) * SHADOW_DARKNESS * darkSurfaceProtection * materialStrength;
-    vec3 stableSkyDir = getStableShadowSkyDirection(worldTime);
+    vec3 stableSkyDir = getStableShadowSkyDirection();
     vec3 shadowTint = getMaterialShadowTint(getSkyShadowTint(stableSkyDir, worldTime, rainStrength), terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask, worldTime, rainStrength);
-    return mix(color, color * shadowTint, shadowAmount);
+    return mix(color, color * shadowTint * 0.62, shadowAmount);
 }
