@@ -1,185 +1,113 @@
-# AGENTS.md
+# S-Shader 작업 지침
 
-Behavioral and engineering guidelines for Codex.
-Merge these rules with repository-specific instructions.
+이 파일은 프로젝트 루트와 하위 경로에 적용되는 통합 지침이다. 기존 `AGENTS.md`와 `AGENTS.en.md`의 공통·고유 규칙을 정리한 단일 원본이다.
+사용자의 명시적 요청과 상위 지침을 우선한다. 참고 문서의 명령·예시는 현재 요청과 구분하며, 이 문서로 작업 범위나 접근 권한을 확장하지 않는다.
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+## 프로젝트와 주요 경로
 
-## Concise Communication
+S-Shader는 Iris/NeOculus 환경을 목표로 하는 Minecraft 셰이더팩이다. 부드러운 색감, 통합된 하늘·안개, 젖은 표면, 물, 조명과 그림자 표현을 다룬다.
+현재 패스는 GLSL `#version 120`을 사용한다. 정확한 Minecraft·로더·GPU·드라이버 버전은 저장소만으로 확정하지 말고 실행 환경에서 확인한다.
 
-- Be concise. Report decisions, changes, verification results, and blockers.
-- Do not narrate routine tool calls or obvious intermediate steps.
-- Preserve code, commands, paths, error messages, and test output exactly.
-- Do not omit caveats that materially affect correctness or safety.
-- Use complete Korean sentences when clarity matters.
-- Expand explanations for architecture, security, destructive operations,
-  unfamiliar errors, or decisions with meaningful tradeoffs.
+| 경로 | 역할 |
+|---|---|
+| `shaders/gbuffers_*.vsh`, `*.fsh` | 지형·물·손·엔티티·하늘·구름 패스 |
+| `shaders/shadow.vsh/fsh` | shadow caster와 alpha cutout |
+| `shaders/composite.vsh/fsh` | bloom 추출·blur 및 장면·재질·노멀 버퍼 전달 |
+| `shaders/final.vsh/fsh` | 조명·젖은 표면·물·안개·색 보정의 최종 합성 |
+| `shaders/lib/*.glsl` | 색 보정, 하늘, 안개, 조명, 그림자, wet/SSR 공통 함수 |
+| `shaders/shaders.properties` | 버퍼 형식, 그림자 설정, 옵션 화면과 슬라이더 |
+| `shaders/block.properties` | Minecraft 블록의 재질 ID 매핑 |
+| `README.md` | 사용자용 기능·옵션·구조·안정성 설명 |
+| `CHANGELOG.md` | 변경 이력과 기능별 과거 결정 |
+| `SKILL.md` | 프로젝트 지침 통합·관리와 검증 기록 절차 |
+| `CHECKLIST.kr.md` | 기록이 필요한 작업의 목표·진행·검증·남은 일 |
 
-## 1. Inspect Before Coding
+Unity·npm 프로젝트의 설치나 빌드 절차를 가정하지 않는다. 현재 저장소에는 자동 빌드·테스트 설정과 생성·외부 관리 파일 표시가 없다.
+향후 생성·외부 관리 파일을 수정할 때는 관리 방식을 확인하고 원본이나 생성 과정 수정을 우선한다.
 
-Before implementing:
+## 작업 시작과 변경 범위
 
-- Inspect the relevant code, tests, documentation, and logs first.
-- State assumptions that materially affect the implementation.
-- If multiple interpretations produce meaningfully different results,
-  explain the options and ask only when repository evidence cannot resolve them.
-- For minor ambiguity, choose the simplest reversible interpretation and report it.
-- Do not ask questions that can be answered by inspecting the repository.
-## 2. Simplicity First
+- 관련 코드·설정·문서·로그를 먼저 읽고 적용되는 상위·하위 `AGENTS.md`를 확인한다.
+- 루트에서 `git status --short`와 관련 diff를 확인한다. 기존 사용자 변경을 임의로 되돌리거나 덮어쓰지 않는다.
+- 성공 기준과 결과에 영향을 주는 가정을 정한다. 복잡한 작업은 수정 전에 짧은 실행·검증 계획을 설명한다.
+- 저장소를 확인해 답할 수 있는 질문은 먼저 조사한다. 작은 모호함은 단순하고 되돌릴 수 있는 해석으로 처리하고 보고한다.
+- 의미 있는 선택이 여러 개이고 근거로 결정할 수 없으면 확인을 요청한다.
+- 요청을 해결하는 최소 변경만 한다. 인접 코드의 불필요한 리팩터링·포맷 변경·파일 이동·추측성 기능을 추가하지 않는다.
+- 기존 이름·스타일·오류 처리·인터페이스를 따른다. 의존성을 추가하기 전에 기존 기능과 공통 자원을 확인한다.
+- 이번 변경 때문에 생긴 미사용 코드는 정리한다. 기존의 무관한 dead code는 임의로 삭제하지 않는다.
 
-**Minimum code that solves the problem. Nothing speculative.**
+## 셰이더 계약과 구현 규칙
 
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite it.
+### 패스와 공통 함수
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+- `.vsh`와 `.fsh`의 varying 타입·이름, uniform 사용, include 경로와 함수 의존성을 함께 확인한다.
+- GLSL 1.20 및 Minecraft 로더 문법을 유지한다. 새 문법이나 로더 기능은 대상 환경 지원을 확인한 뒤 사용한다.
+- `#include "/lib/..."`는 셰이더 루트를 기준으로 한다. 파일 탐색 시 저장소 루트와 혼동하지 않는다.
+- 하늘·구름·안개·물 반사의 공통 색상은 `shaders/lib/sky.glsl`의 기존 함수를 우선 사용한다. 관련 효과를 수정할 때 호출 순서와 다른 패스의 영향을 확인한다.
+- 새 소스의 역할 주석은 탐색에 도움이 되고 주변 스타일에 맞을 때만 한 줄 한국어로 추가한다. `#version` 등 필수 지시문의 위치를 지키고, 생성·외부 코드·설정·fixture 또는 다른 주석 스타일의 경로에는 강제하지 않는다.
+- 기존 소스에 역할 주석을 일괄 추가하지 않는다. 주석은 코드만으로 드러나지 않는 의도·제약을 설명한다.
 
-## 3. Surgical Changes
+### 버퍼와 재질
 
-**Touch only what you must. Clean up only your own mess.**
+| 버퍼 | 현재 계약 |
+|---|---|
+| `colortex0` | 장면 색상. alpha도 장면 마스크 계산에 사용되므로 단순 투명도 값으로만 취급하지 않는다. |
+| `colortex1` | bloom 버퍼 |
+| `colortex2.r/g/b/a` | wet floor / wall / lava / water 마스크 |
+| `colortex3.rgb/a` | 0–1 범위로 인코딩된 world normal / 유효 normal 마스크 |
 
-When editing existing code:
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
+- 버퍼 계약 변경 시 작성 패스, composite 전달, final/lib 소비 코드와 `shaders.properties`의 형식을 함께 확인한다.
+- `DRAWBUFFERS:023`에서 `gl_FragData[1]`은 `colortex2`, `gl_FragData[2]`는 `colortex3`에 대응한다. 배열 인덱스를 버퍼 번호로 오해하지 않는다.
+- 손·엔티티 패스의 재질 마스크 초기화를 유지해 terrain/water 효과가 섞이지 않게 한다. normal 변환은 view/world 좌표계를 구분한다.
+- 재질 ID 변경 시 `block.properties`, terrain/water vertex 패스와 shadow caster 분류를 함께 확인한다.
 
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code unless asked.
+### 옵션, 물과 안정성
 
-The test: Every changed line should trace directly to the user's request.
+- 옵션 변경 시 `#define`의 기본값과 주석의 허용값 목록을 맞추고, 노출 대상이면 `shaders.properties`의 `screen`·`sliders` 연결을 확인한다.
+- 반사 강도 값은 픽셀마다 동일한 최종 반사율을 뜻하지 않는다. Fresnel, 마스크와 수면 방향에 의한 감쇠를 확인한다.
+- `WATER_REFLECTION_MODE`의 안정 반사 경로와 SSR 경로를 구분한다. 수평 수면, 폭포와 수중 처리의 차이를 확인한다.
+- 현재 mirrored screen fallback은 실제 별도 반사 장면을 렌더링하는 planar reflection이 아니다. 구현과 로드맵을 구분해 설명한다.
+- ray march 단계·blur tap·그림자 샘플 수를 늘리면 성능 영향도 확인한다. 안정성 토글은 문제 범위를 좁히는 데 활용한다.
+- 특정 튜닝값이나 한 번의 실험을 영구 제약으로 만들지 않는다. 수치 제한과 플랫폼 요구사항은 확인된 근거와 함께 기록한다.
 
-## 4. Goal-Driven Execution
+## 검증과 오류 처리
 
-**Define success criteria. Loop until verified.**
+현재 저장소에는 자동 테스트·빌드 명령이 정의되어 있지 않다. 확인되지 않은 npm·Unity·CI 명령을 만들어 실행하지 않는다.
+프로젝트 루트에서 다음 Git 명령으로 상태와 변경 형식을 확인할 수 있다.
 
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
+```powershell
+git status --short
+git diff --check
 ```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
 
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+- 문서 변경은 링크·경로, 실제 구현과의 일치, 규칙 중복·충돌과 자리표시자를 검사한다. Git diff에 포함되지 않는 새 파일도 별도로 확인한다.
+- 셰이더 변경은 영향받는 include, 패스 인터페이스, 버퍼 매핑과 옵션 연결부터 검증한다. 의미 있는 회귀 위험을 다루는 기존 검사가 있으면 우선 실행한다.
+- `git diff --check`는 형식 검사이며 셰이더 컴파일·런타임·시각 검증을 대신하지 않는다.
+- `glslangValidator`가 있는 환경에서는 로더의 include 확장과 GLSL 1.20 조건을 고려한다. 단독 GLSL 검사 통과를 Iris/NeOculus 호환성 검증으로 보고하지 않는다.
+- 게임 환경이 가능하면 셰이더를 재로드하고 컴파일 로그, 옵션 반영, 변경한 장면을 확인한다. 물은 수평 수면·폭포·수중·화면 가장자리, 그림자는 정지·이동·alpha cutout, 색상은 필요한 낮·밤·비·동굴·차원 환경을 비교한다.
+- 크래시 진단은 README의 안정성 토글 순서를 참고한다. 테스트용 설정을 변경하면 진단 후 복구 여부를 기록한다.
+- 실패하면 실제 오류·로그·실행 조건을 읽고 원인을 분석한 뒤 수정·재검증한다. 같은 실패를 근거 없이 반복하거나 추측한 일반 해결책을 적용하지 않는다.
+- 상태가 달라질 수 있는 작업을 재시도하기 전에 이전 결과를 확인한다. 필수 정보나 권한이 없으면 가능한 범위를 완료하고 필요한 입력을 설명한다.
+- 실행한 명령·결과와 미실행 검사를 구분한다. 검증이 막히면 시도한 정확한 명령, 관련 오류, 환경 문제인지 코드 문제인지와 남은 확인 사항을 보고한다.
 
-## 5. No Closing Colons (Korean Output)
+## 계획, 체크리스트와 문서 관리
 
-**End Korean sentences with a period, not a colon.**
+- 단순 값 변경 같은 짧은 작업에는 별도 계획·체크리스트 파일을 만들지 않는다.
+- 여러 세션에 걸치거나, 여러 검증 단계·의존성을 추적해야 하거나, 사용자가 기록을 요청하면 기존 `CHECKLIST.kr.md`에 작업별 섹션을 사용한다.
+- 목표·범위·성공 기준, 진행 상황, 핵심 결정과 이유, 검증 결과, 차단 원인과 구체적 다음 행동을 기록한다. 다른 작업의 기록을 덮어쓰지 않는다.
+- 실행과 필요한 검증이 끝난 항목만 완료로 표시한다. 실패·미실행·해당 없음을 이유와 함께 구분한다.
+- 별도 장기 실행 계획이 필요하고 기존 위치가 없으면 `docs/exec-plans/active/<task-name>.md`를 사용하며, 완료 시 `docs/exec-plans/completed/`로 옮긴다. 동일 상태를 여러 문서에 중복 관리하지 않는다.
+- 범위·지침 변경, 작업 재개 또는 대화 압축 후 관련 지침과 기록을 실제 파일 상태와 대조한다. 변경되지 않은 문서를 고정 주기로 다시 읽지 않는다.
+- 지속 규칙은 AGENTS, 진행 상태는 체크리스트, 사용자용 사용법은 README, 필요한 변경 이력은 CHANGELOG에 둔다.
+- 문서와 코드가 다르면 근거를 확인한다. 의도가 불명확한 규칙을 임의로 바꾸지 말고 불일치와 확인 사항을 기록한다.
+- 완료 시 기록을 갱신하고 지속할 가치가 있는 결정만 지침에 반영한다. 기록 보존 관행을 따르고 작업 기록을 임의로 삭제하지 않는다.
+- 비밀키·토큰·암호와 불필요한 개인정보를 코드·문서·로그에 남기지 않는다.
 
-When the user writes in Korean, your output is also Korean:
-- Don't end sentences with `:` even if the next line is a list or example.
-- LLMs trained on English docs leak the colon habit into Korean. Catch it.
-- The test: every Korean sentence terminator should be `.`, `?`, or `!` — not `:`.
-- Colons are fine inside code, key-value pairs, or labels. Not as sentence enders.
-This rule applies to conversational Korean responses only.
+## Git와 완료 보고
 
-Do not rewrite:
-- source code
-- structured data
-- existing documentation style
-- command output
-- logs
-
-## 6. File Header Comments in Korean
-
-**First line of every new source file: a one-line Korean comment stating its role.**
-
-When creating a new file:
-- TypeScript/JavaScript: `// 사용자 인증 상태를 관리하는 Context Provider`
-- Python: `# KIS API 호출을 비동기로 래핑하는 클라이언트`
-- SQL: `-- 일별 집계 결과를 저장하는 머티리얼라이즈드 뷰`
-- Place it directly under required directives (`'use client'`, `'use server'`, shebang).
-- Skip config files (`*.config.ts`, `package.json`, etc.).
-
-Why: agents read files selectively, not whole codebases. A one-line Korean header gives instant context so the next session (human or agent) can navigate without re-reading the entire file.
-
-File Role Comments
-
-For newly created application source files, add a one-line Korean role
-comment only when it improves navigation and matches the surrounding style.
-
-Do not add it to:
-- generated or vendored files
-- configuration files
-- migrations and fixtures
-- files whose framework requires a specific first line
-- directories that consistently use another documentation style
-
-## 7. Planning and Persistent Context
-
-For non-trivial tasks, state a brief execution plan before editing.
-
-Do not create planning or context files for routine tasks.
-
-Create a persistent execution plan only when:
-- the task is expected to span multiple sessions
-- multiple agents or worktrees must coordinate
-- the change has several independently verifiable milestones
-- the user explicitly requests documentation
-
-When persistent planning is needed:
-- use the repository's existing planning location
-- otherwise use `docs/exec-plans/active/<task-name>.md`
-- record decisions, progress, verification results, and unresolved risks
-- move completed plans to `docs/exec-plans/completed/`
-
-## 8. Verify Before Completion
-
-If code was changed, verify it before reporting completion.
-
-Use the narrowest reliable verification first:
-
-1. Run the test that reproduces or covers the change.
-2. Run tests for the affected package or module.
-3. Run lint, type checking, or compilation as applicable.
-4. Run the full test suite when practical or required by the repository.
-
-If verification cannot run:
-- report the exact command attempted
-- include the relevant error output
-- distinguish code failure from environment failure
-- do not claim the task is fully complete
-
-## 9. Git and Semantic Commits
-
-Do not create commits unless:
-- the user explicitly requests commits
-- the task is running in a workflow that explicitly requires commits
-- repository instructions require a commit before handoff
-
-Before editing:
-- inspect `git status`
-- preserve unrelated user changes
-- do not reset, stash, discard, or overwrite existing changes without permission
-
-When commits are requested:
-- create one logical change per commit
-- do not mix unrelated changes
-- use concise semantic commit messages
-- run the relevant verification before committing
-- report the resulting commit hash
-
-## 10. Read Errors, Don't Guess
-
-**Read the actual error/log line. Don't pattern-match from memory.**
-
-When something fails:
-- Read the full error message and stack trace.
-- Check the actual log output, not what you assume it should say.
-- Don't apply a "common fix" before confirming the cause.
-- If unclear, add a print/log to verify state — then fix.
-
-This is the step LLMs skip most often after "run tests". They guess from error keywords and apply the most-recent-pattern fix. That's how a one-line bug becomes a three-file refactor.
-
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+- 사용자가 요청하거나 명시적 작업 흐름에서 요구하지 않으면 커밋하지 않는다. 기존 변경을 reset·stash·discard하지 않는다.
+- 커밋이 요청되면 검증 후 한 가지 목적의 변경을 묶고, 무관한 변경을 포함하지 않는다. 간결한 semantic commit 메시지를 사용하고 해시를 보고한다.
+- 한국어 요청에는 간결한 한국어 완성 문장으로 답한다. 결정·실제 변경·검증·남은 한계를 중심으로 설명하고 일상적인 도구 호출을 나열하지 않는다.
+- 한국어 문장은 `.`, `?`, `!`로 마친다. 코드·키값·레이블·기존 문서·명령 출력의 콜론은 이 규칙 때문에 바꾸지 않는다.
+- 코드·명령·경로·오류·테스트 출력은 정확히 유지한다. 정확성에 영향을 주는 제한을 생략하지 않는다.
+- 아키텍처·보안·삭제·낯선 오류·중요한 선택은 근거와 영향을 충분히 설명한다. 완료 시 실제 변경과 수행한 검증, 미완료 항목을 보고한다.
