@@ -35,6 +35,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 옵션은 Iris/NeOculus 셰이더 옵션 화면에 직접 노출됩니다.
 
 - `SHADOW_MODE`: `0` = 고정 반경 Poisson PCF (기본값), `1` = 실험적 PCSS
+- `shadowDistance`: 그림자 투영 범위의 반경(블록). 슬라이더 선택값은 `32`, `48`, `64`, `96`, `128`, `160`, `192`, `256`이며 기본값은 `96`입니다.
 - `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사, `1` = 약한 SSR 추가
 - `ENABLE_CONTACT_SHADOWS`: 가까운 거리 screen-space contact shadow on/off
 - `ENABLE_NORMAL_FORM_LIGHTING`: normal buffer 기반 지형 입체 조명 on/off
@@ -88,7 +89,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `SHADOW_MODE = 0`: 8-sample Poisson PCF
 - `SHADOW_MODE = 1`: 8-sample blocker search + 8-sample filter PCSS
 - `shadowMapResolution = 2048`
-- `shadowDistance = 96.0`
+- `shadowDistance = 96.0` 기본값, 게임 내 셰이더 옵션에서 32~256블록으로 조절 가능
 - `shadowIntervalSize = 8.0`
 - 위 세 설정은 `lib/shadow_settings.glsl`의 GLSL 상수로 선언하고 shadow/final 패스에서 공유
 - nearest 깊이 샘플을 비교한 뒤 결과를 bilinear 보간해 깊이 경계의 가짜 표면과 텍셀 단위 튐 완화
@@ -109,6 +110,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - 그림자 강도 0.94와 tint 밝기 배율 0.62로 그림자 명도 감소, 어두운 재질 보호 유지
 
 단일 shadow map의 재투영·해상도 한계와 맵 가장자리 fade는 남아 있습니다. 이동 중 모든 경계 변화가 제거된 것은 아니며, 변경의 시각 품질은 게임에서 확인해야 합니다. 기존 옵션 파일에 `SHADOW_MODE = 1`이 저장되어 있다면 안정성 비교 시 `0`으로 바꿉니다.
+
+그림자 범위가 짧다면 셰이더 옵션의 `shadowDistance`를 128 또는 160부터 비교합니다. 이 값은 그림자 투영 범위를 넓히며, Minecraft의 청크 렌더 거리를 늘리지는 않습니다. 청크 렌더 거리와 광원 각도, 맵 가장자리 감쇠에 따라 실제 보이는 그림자 범위는 설정값과 다를 수 있습니다. 해상도는 2048로 유지하므로 거리를 늘리면 같은 표면에 배정되는 그림자 텍셀 수가 줄어 경계가 덜 선명하거나 흔들림이 더 보일 수 있습니다. 실제 FPS와 시각 품질은 게임에서 확인해야 합니다.
 
 깊이 비교 보간은 PCF 필터당 최대 36회, 비 노출 판정당 최대 24회의 깊이 읽기를 사용합니다. 비 노출 판정은 비가 올 때만 실행합니다. PCSS 선택 시 blocker 탐색 8회가 추가됩니다. 실제 GPU 비용과 FPS는 게임에서 확인해야 합니다.
 
