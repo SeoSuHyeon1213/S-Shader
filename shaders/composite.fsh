@@ -10,6 +10,16 @@ uniform float viewHeight;
 
 /* DRAWBUFFERS:0123 */
 
+// Buffer formats are loader directives; keep each one alone on its line inside the block comment.
+// colortex0 = scene color, colortex1 = bloom (16F reduces blur banding),
+// colortex2 = floor/wall/lava/water masks, colortex3 = encoded world normal + valid mask.
+/*
+const int colortex0Format = RGBA8;
+const int colortex1Format = RGBA16F;
+const int colortex2Format = RGBA8;
+const int colortex3Format = RGBA16F;
+*/
+
 #define BLOOM_THRESHOLD 0.8 // Bloom threshold [0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.4 1.6]
 #define LAVA_EMISSION_INTENSITY 1.0 // Lava emission strength [0.0 0.5 0.75 1.0 1.25 1.5 2.0]
 const float BLOOM_KNEE      = 0.2;

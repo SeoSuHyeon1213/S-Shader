@@ -8,12 +8,21 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 현재 개발은 Codex와 Claude Code를 함께 사용해 빠르게 실험하고 있으며, 실제 게임 플레이 스크린샷을 기준으로 색감과 효과를 계속 조정하고 있습니다.
 
+## 문서 읽는 법
+
+이 문서는 다음 네 가지 상태를 구분합니다.
+
+- **구현**: 셰이더 코드에 존재하는 기능입니다. 코드가 있다는 것이 게임 검증을 통과했다는 뜻은 아닙니다.
+- **근사·제한**: 화면 정보나 단일 shadow map만으로 계산해 정확하지 않거나, 알려진 한계가 있는 부분입니다.
+- **검증 상태**: 실제 게임에서 확인한 범위입니다. 아래 [검증 상태](#검증-상태) 절에 모아 둡니다.
+- **향후 기획**: 아직 구현하지 않은 계획입니다.
+
 ## 주요 기능
 
 - 노출, 대비, 채도, 따뜻한 색 보정, ACES 톤 매핑, 파스텔 톤 기반 색 보정
 - 별도 bloom buffer를 사용한 bloom 추출 및 blur
 - `lib/sky.glsl` 기반의 하늘, 구름, 안개, 지형 fog, 물 반사 색 체계 통합
-- 낮/밤 전환과 수평선 부근의 색 층 분리 완화
+- 낮/밤 전환과 수평선 부근의 색 층 분리 완화 (품질 목표이며 게임 비교는 미검증)
 - 비 오는 날 젖은 바닥, 벽면 물 흐름, 웅덩이 반사, wet specular 표현
 - 물 전용 `gbuffers_water`와 물 mask 기반 Fresnel/flow/rough reflection 표현
 - 횃불을 들었을 때 설치된 횃불과 비슷한 따뜻한 주황빛 조명
@@ -26,9 +35,11 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 - Sun: `#F1FEC6`
 - Moon: `#BFD8FF`
-- Torch: `#F5853F`
+- Torch: `#F5853F` (기획 색)
 - Lava: `#FF3A20`
 - Rain accent: `#3423A6`
+
+들고 있는 횃불 조명에 실제로 쓰이는 중심 색은 `lib/lighting.glsl`의 `TORCH_LIGHT_COLOR = vec3(1.000, 0.520, 0.230)`이며 근사 색은 `#FF853B`입니다. 기획 색 `#F5853F`와 약간 다르며, 기획 색을 실제 조명에 적용할지는 게임 화면 비교 후 결정합니다.
 
 ## Shader Options
 
@@ -36,7 +47,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 - `SHADOW_MODE`: `0` = 고정 반경 Poisson PCF (기본값), `1` = 실험적 PCSS
 - `shadowDistance`: 그림자 투영 범위의 반경(블록). 슬라이더 선택값은 `32`, `48`, `64`, `96`, `128`, `160`, `192`, `256`이며 기본값은 `96`입니다.
-- `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사, `1` = 약한 SSR 추가
+- `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사와 mirrored screen fallback (기본값), `1` = 안정 반사를 끄고 SSR 반사로 대체. SSR이 반사 대상을 찾지 못하거나 반사 방향이 화면 밖을 향하면 하늘 반사색을 사용합니다. 두 모드 모두 수평 수면에만 반사를 적용합니다.
 - `ENABLE_CONTACT_SHADOWS`: 가까운 거리 screen-space contact shadow on/off
 - `ENABLE_NORMAL_FORM_LIGHTING`: normal buffer 기반 지형 입체 조명 on/off
 - `ENABLE_WET_GROUND_LAYER`: 비 오는 날 젖은 바닥 darkening/sheen layer on/off
@@ -54,6 +65,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `LAVA_EMISSION_INTENSITY`: 용암 자체 발광과 전용 bloom 강도, 기본값 `1.0`
 - `CONTACT_SHADOW_INTENSITY`
 - `RAIN_REFLECTION_INTENSITY`
+- `WATER_REFLECTION_INTENSITY`: 물 반사 강도의 기준값, 기본값 `0.6`. 수심에 따라 배율이 적용되며 최종 반사율은 Fresnel과 수면 방향의 감쇠를 거칩니다. [Shallow / Deep Water](#shallow--deep-water) 참고
 - `BLOOM_INTENSITY`
 - `BLOOM_THRESHOLD`
 - `FOG_DENSITY`
@@ -71,6 +83,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `colortex3.rgb`: encoded world normal
 - `colortex3.a`: valid normal mask
 
+버퍼 형식(`colortex0` RGBA8, `colortex1` RGBA16F, `colortex2` RGBA8, `colortex3` RGBA16F)은 `composite.fsh`의 블록 주석 안에 로더 지시문으로 선언합니다. `shaders.properties`의 `colortexNFormat` 키는 로더가 읽지 않으므로 사용하지 않습니다.
+
 ## Sky / Fog Layout
 
 - `gbuffers_skybasic`: 기본 하늘 색을 `lib/sky.glsl`의 공통 sky color로 출력
@@ -86,8 +100,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 구현된 부분:
 
 - `shadowtex0`, `shadowModelView`, `shadowProjection` 기반 shadow map sampling
-- `SHADOW_MODE = 0`: 8-sample Poisson PCF
-- `SHADOW_MODE = 1`: 8-sample blocker search + 8-sample filter PCSS
+- `SHADOW_MODE = 0`: 중심 1곳과 고정 Poisson 8곳, 총 9개 필터 위치의 PCF
+- `SHADOW_MODE = 1`: 8-sample blocker search 후 같은 9개 위치로 필터링하는 PCSS. blocker를 찾지 못하면 PCF로 대체
 - `shadowMapResolution = 2048`
 - `shadowDistance = 96.0` 기본값, 게임 내 셰이더 옵션에서 32~256블록으로 조절 가능
 - `shadowIntervalSize = 8.0`
@@ -101,7 +115,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - shadow pass의 기본 alpha cutout 및 water/lava caster 제외
 - foliage/crop/glass material의 dithered partial caster rule
 - material mask 기반 wet/water/lava shadow tint 및 강도 보정
-- 플레이어 이동에 따라 변하지 않는 안정 우선 PCF/PCSS radius와 shadow strength
+- 플레이어 거리에 따라 바뀌던 PCF/PCSS 필터 반경과 그림자 농도 보정을 제거해 이동에 따른 필터·농도 변화 완화
 - `ENABLE_CONTACT_SHADOWS = 0` 기본값으로 screen-space 그림자 이동감 최소화
 - texture-coordinate 기반 partial caster dither로 shadow reprojection crawling 완화
 - terrain-only PCSS penumbra 기반 soft shadow 표현력 복구
@@ -109,13 +123,13 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - 실제 shadowModelView 광원 방향으로 표면 음영과 sky tint 계산, 시선 각도에 따른 form shadow 감쇠 제거
 - 그림자 강도 0.94와 tint 밝기 배율 0.62로 그림자 명도 감소, 어두운 재질 보호 유지
 
-단일 shadow map의 재투영·해상도 한계와 맵 가장자리 fade는 남아 있습니다. 이동 중 모든 경계 변화가 제거된 것은 아니며, 변경의 시각 품질은 게임에서 확인해야 합니다. 기존 옵션 파일에 `SHADOW_MODE = 1`이 저장되어 있다면 안정성 비교 시 `0`으로 바꿉니다.
+근사·제한: 그림자는 카메라를 중심으로 한 단일 shadow map을 사용합니다. 카메라가 `shadowIntervalSize` 8블록 경계를 넘을 때마다 맵이 재투영되고, 텍셀 해상도와 맵 가장자리 fade, `shadowDistance`로 정해지는 가시 범위의 한계가 남아 있습니다. 따라서 이동 중 그림자 경계가 전혀 변하지 않는 것은 아니며, 변경의 시각 품질은 게임에서 확인해야 합니다. 기존 옵션 파일에 `SHADOW_MODE = 1`이 저장되어 있다면 안정성 비교 시 `0`으로 바꿉니다.
 
 그림자 범위가 짧다면 셰이더 옵션의 `shadowDistance`를 128 또는 160부터 비교합니다. 이 값은 그림자 투영 범위를 넓히며, Minecraft의 청크 렌더 거리를 늘리지는 않습니다. 청크 렌더 거리와 광원 각도, 맵 가장자리 감쇠에 따라 실제 보이는 그림자 범위는 설정값과 다를 수 있습니다. 해상도는 2048로 유지하므로 거리를 늘리면 같은 표면에 배정되는 그림자 텍셀 수가 줄어 경계가 덜 선명하거나 흔들림이 더 보일 수 있습니다. 실제 FPS와 시각 품질은 게임에서 확인해야 합니다.
 
-깊이 비교 보간은 PCF 필터당 최대 36회, 비 노출 판정당 최대 24회의 깊이 읽기를 사용합니다. 비 노출 판정은 비가 올 때만 실행합니다. PCSS 선택 시 blocker 탐색 8회가 추가됩니다. 실제 GPU 비용과 FPS는 게임에서 확인해야 합니다.
+각 필터 위치는 주변 깊이 4개를 비교한 뒤 bilinear 보간하므로, PCF 필터당 9개 위치 × 4회 = 최대 36회, 비 노출 판정당 최대 24회의 깊이 읽기를 사용합니다. 비 노출 판정은 비가 올 때만 실행합니다. PCSS 선택 시 blocker 탐색 8회가 추가됩니다. 실제 GPU 비용과 FPS는 게임에서 확인해야 합니다.
 
-남은 작업:
+향후 기획:
 
 - torch 등 emissive block에 대한 더 정교한 caster rule
 - 실제 cascade shadow map 기반 장거리 안정화
@@ -129,14 +143,14 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 - `colortex2.a` water mask 기반 물 표면 효과
 - sky/Fresnel/roughness/flow 기반 안정 물 반사
-- 수평 물 전용 low-cost planar 스타일 mirrored screen fallback
-- `WATER_REFLECTION_MODE = 1`에서 water SSR 추가
+- 수평 물 전용 low-cost mirrored screen fallback (현재 화면을 뒤집어 읽는 근사이며, 반사 장면을 별도로 렌더링하는 planar reflection이 아님)
+- `WATER_REFLECTION_MODE = 1`에서 안정 반사 대신 water SSR 사용, 실패 시 하늘 반사색으로 대체
 - 20-step SSR ray march와 6-step binary refinement
 - 9-tap roughness blur 기반 SSR reflection filtering
 - 물 표면과 depthtex1 불투명 바닥의 world-space 높이 차이에 기반한 수심별 alpha/반사/색 흡수
 - 폭포/수직 물기둥의 flow/absorption 중심 표현
 
-남은 작업:
+향후 기획:
 
 - 별도 reflected scene texture 기반 진짜 planar reflection
 - loader별 reflection/depth buffer 지원 여부 확인
@@ -170,7 +184,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 ## Crash / Stability Debug
 
-NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 불안정을 만들 수 있어, 최근 기능은 옵션으로 분리했습니다.
+NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 불안정을 만들 수 있다고 의심되어, 최근 기능은 옵션으로 분리했습니다. 크래시의 실제 원인은 게임 로그로 확인되기 전까지 확정하지 않습니다.
 
 크래시가 의심될 때 권장 테스트 순서:
 
@@ -182,6 +196,12 @@ NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 
 ## Status
 
 아직 개발 중인 셰이더팩입니다. 핵심 후처리, 하늘/fog 통합, 젖은 표면, 물 표현, PCSS 그림자, contact shadow, normal buffer 기반 지형 조명은 구현되어 있지만 실제 게임 내 낮, 밤, 동굴, 비, 네더, 엔드 환경에서 추가 튜닝이 필요합니다.
+
+## 검증 상태
+
+- 최근 그림자·물 수심·용암 발광·버퍼 형식 변경은 정적 검사(include 경로, 패스 인터페이스, 옵션 연결)만 마쳤습니다. 게임 컴파일, 화면 비교와 FPS 측정은 아직 하지 않았습니다.
+- 안정성 향상과 색 층 분리 완화는 품질 목표이며, 아직 게임에서 비교 검증하지 않았습니다.
+- 호환성은 실제로 확인한 Minecraft·로더·GPU/드라이버 조합에 대해서만 이 절에 기록합니다. 현재 기록된 확인 조합은 없습니다.
 
 ## License
 

@@ -4,6 +4,21 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-17 - Buffer Format Directives and README Accuracy
+
+### Fixed
+
+- Moved colortex0-3 formats from ignored `shaders.properties` keys into block-comment loader directives in `composite.fsh` (RGBA8, RGBA16F, RGBA8, RGBA16F).
+
+### Documentation
+
+- Corrected README shadow movement wording, water reflection mode 1 path (SSR replaces stable reflection with sky fallback), PCF sample/read counts and the torch design vs. constant color.
+- Added `WATER_REFLECTION_INTENSITY` to the option list and separated implemented, approximate/limited, verification and planned items.
+
+### Test Notes
+
+- Static checks only. In-game compilation and buffer format confirmation remain pending; no Iris/NeOculus environment was available.
+
 ## 2026-10-05 - Depth-Based Water Transparency and Reflections
 
 ### Changed
