@@ -290,3 +290,11 @@
 - 검증: `applyWaterSurface`의 하늘색 반사(`skyMatchedReflection`, `softReflection`)와 SSR의 fallback·hit 혼합이 모두 강도에 비례함을 코드로 확인했다. 정적 검사뿐이다.
 - 미실행: 게임에서 수중의 수면 아랫면, 수면 상하 전환과 밝기 변화를 확인하지 않았다. 반사를 끈 뒤 아랫면이 너무 밋밋하거나 밝으면 굴절 창·전반사 근사를 별도로 검토한다.
 - P1-5의 나머지(수중 색 흡수와 시인성, 얕은 물/깊은 물의 착색)는 게임 확인이 필요해 미체크로 둔다.
+
+### 2026-10-19 진행 기록 - CHANGELOG 하단 Current 섹션 정리
+
+- 정적 근거: CHANGELOG 하단의 옵션 목록에 `shadowDistance`·`LAVA_EMISSION_INTENSITY`·`WATER_REFLECTION_INTENSITY`가 빠져 있었다. 그림자 상태에는 제거된 거리 split·`SHADOW_DARKNESS = 0.74`·glass caster 제외가 남아 있었고, 물 로드맵은 SSR을 "약한 SSR"로 설명했다.
+- [x] Options·Buffer Layout·Shadow·Water 상태 절을 README 참조 안내 한 절로 바꿨다. README의 해당 내용이 현재 소스와 맞으므로 같은 상태를 두 문서에서 관리하지 않는다.
+- [x] Goals와 Material IDs는 README에 없는 내용이라 유지했다. Material IDs는 `block.properties`의 11000–11105와 일치한다.
+- [x] Planned는 체크리스트 P1·P2·별도 연구 과제와 겹치는 항목을 빼고, 이 체크리스트를 가리키는 안내와 남은 장기 계획 3개만 남겼다.
+- 검증: README의 옵션 26개(`#define` 25개와 `shadowDistance`)가 소스와 일치하고, 참조한 README 절 제목과 체크리스트 섹션 제목이 존재함을 확인했다. `git diff --check`를 실행했다.

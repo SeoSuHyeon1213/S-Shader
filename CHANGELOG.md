@@ -461,42 +461,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - material mask 구조를 유지해 lava, water, wet floor, wall, foliage, glass, crop 등 재질별 효과를 분리.
 - NeOculus/Embeddium 환경에서 shaderpack zip 구조와 GLSL 호환성을 계속 검증.
 
-## Current Shader Options
+## Current State Reference
 
-- `SHADOW_MODE`
-- `WATER_REFLECTION_MODE`
-- `ENABLE_CONTACT_SHADOWS`
-- `ENABLE_NORMAL_FORM_LIGHTING`
-- `ENABLE_WET_GROUND_LAYER`
-- `ENABLE_WET_SCREEN_REFLECTIONS`
-- `ENABLE_WET_SPECULAR`
-- `ENABLE_WATER_SURFACE`
-- `EXPOSURE`
-- `CONTRAST`
-- `SATURATION`
-- `LIGHTING_STRENGTH`
-- `DAY_LIGHT_STRENGTH`
-- `NIGHT_LIGHT_STRENGTH`
-- `SUNSET_GLOW_STRENGTH`
-- `TORCH_LIGHT_INTENSITY`
-- `CONTACT_SHADOW_INTENSITY`
-- `RAIN_REFLECTION_INTENSITY`
-- `BLOOM_INTENSITY`
-- `BLOOM_THRESHOLD`
-- `FOG_DENSITY`
-- `FOG_START`
-- `VIGNETTE_OUTER`
-
-## Current Buffer Layout
-
-- `colortex0`: scene color.
-- `colortex1`: bloom buffer.
-- `colortex2.r`: wet floor mask.
-- `colortex2.g`: wall mask.
-- `colortex2.b`: lava mask.
-- `colortex2.a`: water mask.
-- `colortex3.rgb`: encoded world normal.
-- `colortex3.a`: valid normal mask.
+현재 옵션 목록, 버퍼 형식·채널, 그림자·물의 구현 범위와 근사·제한, 검증 상태는 [README.md](README.md)의 Shader Options, Buffer Layout, Shadow Status, Water Status, 검증 상태 절을 기준으로 합니다. 같은 상태를 이 파일에 중복해 관리하지 않으며, 위 날짜별 항목은 당시의 기록입니다.
 
 ## Current Material IDs
 
@@ -509,55 +476,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - `block.11104`: glass wet response group.
 - `block.11105`: crops/small plants low-reflection group.
 
-## Current Shadow Implementation Status
-
-현재 그림자 구현률 추정: 약 65-72%.
-
-구현된 부분:
-
-- `shadowtex0`, `shadowModelView`, `shadowProjection` 기반 shadow map sampling.
-- `shadowMapResolution = 2048`.
-- `shadowDistance = 96.0`.
-- `shadowIntervalSize = 8.0`.
-- `SHADOW_MODE = 0`: 8-sample Poisson PCF.
-- `SHADOW_MODE = 1`: 8-sample blocker search + 8-sample filter PCSS.
-- `SHADOW_DARKNESS = 0.74` 기반 강화된 shadow tint.
-- screen-space contact shadow option (`ENABLE_CONTACT_SHADOWS = 0` by default for movement stability).
-- normal buffer 기반 terrain form lighting.
-- alpha cutout 처리 및 water/lava/glass 계열 solid shadow caster 제외.
-- 거리 fade, shadow map edge fade, 날씨 fade, 낮/밤 fade, sky color 기반 shadow tint.
-- 비 오는 날 wet surface 반응을 위한 shadow 기반 rain exposure 보조 함수.
-
-현재 한계:
-
-- screen-space contact shadow는 화면 밖 또는 가려진 geometry 정보를 처리하지 못함.
-- foliage 세부 투과 그림자와 colored shadow는 아직 없음.
-- cascade shadow map 또는 distance split 기반 원거리 안정화는 아직 없음.
-- material별 shadow tint와 directional BRDF 반응은 아직 단순함.
-
-## Water Reflection Roadmap
-
-구현된 부분:
-
-- `colortex2.a` water mask 픽셀에만 물 효과 적용.
-- sky/Fresnel/roughness/flow 기반 안정 물 표현.
-- 약한 SSR 옵션 경로 유지.
-- 폭포/수직 물기둥은 reflection보다 absorption + flow shading 중심으로 분리.
-
-남은 부분:
-
-- 진짜 planar reflection.
-- water SSR binary search 품질 개선.
-- roughness blur 고도화.
-- 물 depth/absorption 추가 개선.
-
 ## Planned / Not Implemented
 
-- 인게임 Iris/NeOculus 컴파일 로그 반복 확인.
+진행 상태와 우선순위는 [CHECKLIST.kr.md](CHECKLIST.kr.md)의 "README 검토에 따른 우선 수정·구현 목록"에서 관리합니다. 아래는 그 목록에 아직 항목이 없는 장기 계획입니다.
+
 - 낮, 밤, 동굴, 비, 네더, 엔드 환경별 색감 프리셋 정리.
 - 인게임 스크린샷 기반 wet specular roughness/F0 추가 튜닝.
-- cascade shadow map 또는 distance split 구현.
-- translucent/colored shadow.
-- foliage/glass/emissive material caster rule 세분화.
-- planar water reflection.
 - 옵션 설명과 추천 프리셋 정리.
