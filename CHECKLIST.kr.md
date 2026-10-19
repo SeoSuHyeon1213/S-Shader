@@ -262,3 +262,31 @@
 - P1-2~P1-7은 게임 화면 재현을 전제로 하므로 차단 상태다. 재현 없이 bias·수심·SSR 값을 바꾸는 것은 추측성 변경이라 진행하지 않았다.
 - P2는 P1 검증 이후로 미뤘다. P2-1·P2-4는 버퍼 계약 변경을 포함하므로 컴파일 가능한 환경에서 시작한다.
 - 루트의 `git diff --check`는 통과했고, LF/CRLF 변환 안내만 있었다. 커밋은 하지 않았다.
+
+### 2026-10-19 진행 기록 - P1-6 SSR 반사 방향
+
+- 정적 근거: `lib/ssr.glsl`이 카메라 방향 벡터(`-viewPos`)를 화면 정면 normal(view Z)로 반사해, 수면 normal을 쓰지 않고 좌우가 뒤집힌 ray를 만들었다. Fresnel도 화면 위치에 따라 달라졌다.
+- [x] 평평한 수면 normal(world ±Y)에 world XZ ripple을 더하고 `gbufferModelView`로 view 공간에 옮겼다. `faceforward`로 수중 시점도 카메라 반대쪽으로 반사한다.
+- [x] 입사 ray(`normalize(viewPos)`)를 반사하고 Fresnel은 실제 수면 normal과의 각도를 쓴다. roughness의 ripple 입력 크기는 기존과 같다.
+- [x] `final.fsh`에 `gbufferModelView`를 선언하고 호출 인수를 연결했다. 다른 include에 같은 uniform 선언이 없음을 grep으로 확인했다.
+- 검증: 평평한 수면 수치 검사 560건(수면 위/아래, pitch −80~60°, yaw 4종, 화면 위치 20곳)에서 새 경로의 방향 오차는 1e-6° 이하, Fresnel cos 오차는 2.2e-16이다. 기존 경로는 최대 약 164° 벗어났다. `git diff --check`는 통과했다.
+- 미실행: 이 PC(Windows 11 Pro)에는 `.minecraft`·Iris와 `glslangValidator`·`glslc`가 없어 컴파일·게임 화면·FPS를 확인하지 않았다. P1-6은 게임 검증 전이라 미체크로 둔다.
+- 남은 일: hit 판정이 `depthtex0`의 수면 자체와 맞을 수 있는지, 화면 가장자리·가림 해제 fallback은 게임에서 확인한 뒤 다룬다. `gbuffers_water.fsh`의 wave normal 편향은 아래 기록에서 수정했다.
+
+### 2026-10-19 진행 기록 - 물 wave normal 카메라 편향
+
+- 정적 근거: `getWaterWaveNormal`이 접선 공간 벡터 `(waveX, waveY, 1/0.11)`을 view 공간 normal에 더해, ripple과 무관하게 모든 물 normal이 카메라 쪽(view +Z)으로 약 6° 기울었다. 이 normal은 `colortex3`, Fresnel·alpha, 폭포 판정, final의 stable 반사 방향에 쓰인다.
+- [x] world 공간 수면 normal의 접선·종접선 평면 안에서만 ripple을 더하고, view 공간 normal은 결과를 `gbufferModelView`로 변환해 얻는다. ripple 크기와 `WATER_WAVE_NORMAL_STRENGTH`는 유지했다.
+- 검증: 수치 검사에서 ripple 0일 때 편향은 기존 최대 6.315°에서 0°가 되었고, ripple 기울기 차이는 최대 0.821°다. 10° 하향 시선의 Fresnel은 약 0.52에서 0.68로 올라 alpha 증가는 약 +0.01이다. `git diff --check`는 통과했다.
+- 미실행: 이 PC에는 게임·로더와 GLSL 컴파일러가 없어 컴파일·화면·FPS를 확인하지 않았다. 낮은 시선에서 반사·투명도가 조금 강해지는지는 게임에서 비교해야 한다.
+- 남은 일: `getWaterSpecular`의 view 공간 고정 광원 방향과 atlas `texCoord` 기반 ripple의 블록 반복 여부는 별도 항목(P2-2 등)으로 다룬다.
+
+### 2026-10-19 진행 기록 - P1-5 수중 시점의 수면 하늘 반사
+
+- 정적 근거: `isEyeInWater == 1`이면 수심 보간만 건너뛰고, `waterReflectionIntensity`는 기본값 그대로 `applyWaterSurface`·`applyWaterSSR`에 전달됐다. 그래서 수면 아랫면에도 하늘색 반사가 섞였다.
+- [x] `final.fsh`에서 물속 시점의 물 반사 강도를 0으로 설정했다. 안정 반사와 SSR 경로 모두에 적용된다.
+- [x] `gbuffers_water.fsh`의 하늘 반사 하이라이트 항을 물 밖 시점에서만 더한다. 물 색 tint는 유지했다.
+- [x] `applyWaterSSR`는 강도 0이면 ray march를 생략한다. 물 밖에서 강도 0일 때의 결과는 기존과 같다.
+- 검증: `applyWaterSurface`의 하늘색 반사(`skyMatchedReflection`, `softReflection`)와 SSR의 fallback·hit 혼합이 모두 강도에 비례함을 코드로 확인했다. 정적 검사뿐이다.
+- 미실행: 게임에서 수중의 수면 아랫면, 수면 상하 전환과 밝기 변화를 확인하지 않았다. 반사를 끈 뒤 아랫면이 너무 밋밋하거나 밝으면 굴절 창·전반사 근사를 별도로 검토한다.
+- P1-5의 나머지(수중 색 흡수와 시인성, 얕은 물/깊은 물의 착색)는 게임 확인이 필요해 미체크로 둔다.

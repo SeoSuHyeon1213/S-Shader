@@ -20,6 +20,7 @@ uniform int heldBlockLightValue2;
 uniform int isEyeInWater;
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
+uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 shadowModelView;
 uniform mat4 shadowProjection;
@@ -120,6 +121,8 @@ void main() {
         waterDepthFactor = getWaterDepthFactor(waterColumnDepth);
         waterReflectionIntensity = clamp(WATER_REFLECTION_INTENSITY * getWaterReflectionScale(waterDepthFactor), 0.0, 1.0);
     }
+    // From below, the surface shows refraction or internal reflection, not a sky mirror.
+    if (isEyeInWater == 1) waterReflectionIntensity = 0.0;
     vec3 skyReflectionColor = getSkyWaterReflectionColor(worldDir, worldTime, rainStrength);
     vec3 waterReflectionDir = normalize(reflect(worldDir, worldNormal));
     vec3 waterReflectionColor = getSkyWaterReflectionColor(waterReflectionDir, worldTime, rainStrength);
@@ -168,7 +171,7 @@ void main() {
     color = applyWaterSurface(color, colortex0, texCoord, sceneMask, waterMask, worldNormal, worldDir, dist, waterDepthFactor, waterReflectionColor, surfaceRainStrength, frameTimeCounter, stableWaterReflectionIntensity);
 #endif
 #if WATER_REFLECTION_MODE == 1
-    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, worldNormal, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, waterReflectionIntensity);
+    color = applyWaterSSR(color, colortex0, depthtex0, texCoord, viewPos, waterMask, worldNormal, dist, waterReflectionColor, surfaceRainStrength, frameTimeCounter, gbufferProjection, gbufferProjectionInverse, gbufferModelView, waterReflectionIntensity);
 #endif
 
     color = applyLavaEmission(color, sceneSample.rgb, lavaMask * sceneMask, LAVA_EMISSION_INTENSITY);

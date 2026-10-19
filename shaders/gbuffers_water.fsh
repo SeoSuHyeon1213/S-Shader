@@ -9,6 +9,7 @@ uniform int isEyeInWater;
 uniform float frameTimeCounter;
 uniform float rainStrength;
 uniform int worldTime;
+uniform mat4 gbufferModelView;
 uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferProjectionInverse;
 
@@ -33,11 +34,16 @@ float waterRipple(vec2 uv, float time) {
     return waveA * 0.5 + waveB * 0.5;
 }
 
-vec3 getWaterWaveNormal(vec2 uv, float time, vec3 baseNormal) {
+// Ripples tilt only within the surface plane; a view-Z component would bias normals toward the camera.
+vec3 getWaterWaveNormal(vec2 uv, float time, vec3 worldBaseNormal) {
     float waveX = sin((uv.x + time * 0.020) * 54.0 + uv.y * 17.0);
     float waveY = cos((uv.y - time * 0.016) * 49.0 - uv.x * 21.0);
     vec3 waveNormal = normalize(vec3(waveX, waveY, 1.0 / WATER_WAVE_NORMAL_STRENGTH));
-    return normalize(baseNormal + waveNormal * WATER_WAVE_NORMAL_STRENGTH);
+    vec3 tangentRef = abs(worldBaseNormal.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+    vec3 tangent = normalize(cross(tangentRef, worldBaseNormal));
+    vec3 bitangent = cross(worldBaseNormal, tangent);
+    vec3 rippleOffset = (tangent * waveNormal.x + bitangent * waveNormal.y) * WATER_WAVE_NORMAL_STRENGTH;
+    return normalize(worldBaseNormal + rippleOffset);
 }
 
 float getWaterSpecular(vec3 normal, float ripple) {
@@ -54,8 +60,9 @@ void main() {
 
     vec3 lightColor = texture2D(lightmap, lmCoord).rgb;
     float ripple = waterRipple(texCoord, frameTimeCounter) * isWater;
-    vec3 waterNormal = getWaterWaveNormal(texCoord, frameTimeCounter, normalize(viewNormal));
-    vec3 worldWaterNormal = normalize((gbufferModelViewInverse * vec4(waterNormal, 0.0)).xyz);
+    vec3 worldBaseNormal = normalize((gbufferModelViewInverse * vec4(normalize(viewNormal), 0.0)).xyz);
+    vec3 worldWaterNormal = getWaterWaveNormal(texCoord, frameTimeCounter, worldBaseNormal);
+    vec3 waterNormal = normalize((gbufferModelView * vec4(worldWaterNormal, 0.0)).xyz);
     float facing = clamp(abs(dot(waterNormal, normalize(-viewDir))), 0.0, 1.0);
     float fresnel = pow(1.0 - facing, 2.0) * isWater;
     float specular = getWaterSpecular(waterNormal, ripple) * isWater;
@@ -69,7 +76,8 @@ void main() {
     float verticalWater = smoothstep(0.30, 0.86, 1.0 - abs(worldWaterNormal.y)) * isWater;
     waterColor += waterTint * (0.014 + fresnel * 0.022 + ripple * 0.004) * isWater;
     waterColor = mix(waterColor, waterColor * vec3(0.68, 0.78, 0.92), verticalWater * 0.28);
-    waterColor += skyReflection * (fresnel * 0.036 + specular * 0.026) * isWater * (1.0 - verticalWater * 0.72);
+    float aboveWater = float(isEyeInWater == 0);
+    waterColor += skyReflection * (fresnel * 0.036 + specular * 0.026) * isWater * aboveWater * (1.0 - verticalWater * 0.72);
 
     vec3 outColor = mix(baseColor, waterColor, isWater);
     float baseAlpha = WATER_FALLBACK_ALPHA;

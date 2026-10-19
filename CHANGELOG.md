@@ -4,6 +4,39 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-19 - No Sky Mirror on the Underwater Surface
+
+### Fixed
+
+- With the eye underwater, the final pass applied the full stable sky reflection (and the SSR sky fallback in mode 1) to the underside of the water surface. `isEyeInWater == 1` now sets the water reflection intensity to 0, and `gbuffers_water` skips its small sky highlight term.
+- `applyWaterSSR()` returns early when the intensity is 0, skipping the ray march.
+
+### Test Notes
+
+- Static check only: every sky-colored term in `applyWaterSurface()` and `applyWaterSSR()` scales with the intensity. Snell's window and total internal reflection are not implemented. In-game visuals remain unverified.
+
+## 2026-10-19 - Water Wave Normal Camera Bias
+
+### Fixed
+
+- `gbuffers_water.fsh` added a tangent-space wave vector to the view-space normal, so its constant Z part tilted every water normal about 6 degrees toward the camera. Ripples now tilt only within the world-space surface plane, and the view-space normal is derived from that result with `gbufferModelView`.
+- The bias affected the written `colortex3` normal, Fresnel, alpha boost, vertical-water detection and the final stable reflection direction. Ripple amplitude is kept within about 1 degree of the previous value.
+
+### Test Notes
+
+- A numeric check over top and waterfall faces and 12 camera directions showed 0 degrees of zero-ripple bias (previously up to 6.3). Fresnel at a 10-degree downward view rises from about 0.52 to 0.68. In-game compilation and visuals remain unverified.
+
+## 2026-10-19 - Water SSR Reflection Direction
+
+### Fixed
+
+- Water SSR (`WATER_REFLECTION_MODE = 1`) reflected the camera-facing vector about a screen-facing view Z normal, mirroring rays horizontally and ignoring camera pitch. It now reflects the eye-to-surface ray about the flat water plane normal transformed by `gbufferModelView`, faced toward the camera for views from below.
+- Fresnel now uses the angle to that surface normal instead of the screen position. Ripples tilt the plane in world XZ with the same magnitude, so the roughness input is unchanged.
+
+### Test Notes
+
+- A flat-plane numeric check (560 camera/pixel cases, above and below water) matched the ground-truth mirror direction within 1e-6 degrees; the old path was off by up to about 164 degrees. In-game compilation, visuals and FPS remain unverified.
+
 ## 2026-10-17 - Buffer Format Directives and README Accuracy
 
 ### Fixed

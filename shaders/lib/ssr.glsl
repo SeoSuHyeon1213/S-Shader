@@ -24,10 +24,12 @@ vec3 reconstructSSRViewPosition(vec2 uv, float depth, mat4 projectionInverse) {
     return viewPos.xyz / viewPos.w;
 }
 
-vec3 getSSRWaterNormal(vec2 uv, float time) {
+// Ripples tilt the flat water plane in world XZ; screen-facing view Z is not the surface normal.
+vec3 getSSRWaterNormal(vec2 uv, float time, vec3 worldNormal) {
     float waveX = sin((uv.x + time * 0.020) * 54.0 + uv.y * 17.0);
     float waveY = cos((uv.y - time * 0.016) * 49.0 - uv.x * 21.0);
-    return normalize(vec3(waveX * 0.10, waveY * 0.10, 1.0));
+    vec3 planeNormal = vec3(0.0, worldNormal.y < 0.0 ? -1.0 : 1.0, 0.0);
+    return normalize(planeNormal + vec3(waveX, 0.0, waveY) * 0.10);
 }
 
 float getSSRDepthDelta(vec3 rayPos, vec2 hitUv, sampler2D depthTexture, mat4 projectionInverse) {
@@ -104,21 +106,27 @@ vec3 applyWaterSSR(
     float frameTimeCounter,
     mat4 projection,
     mat4 projectionInverse,
+    mat4 modelView,
     float intensity
 ) {
     float mask = clamp(waterMask, 0.0, 1.0);
-    if (mask <= 0.001) return color;
+    if (mask <= 0.001 || intensity <= 0.0) return color;
 
     float verticalWater = smoothstep(0.30, 0.86, 1.0 - abs(normalize(worldNormal).y));
     float nearWater = 1.0 - smoothstep(6.0, 24.0, viewDistance);
     float waterfallMask = verticalWater * nearWater;
 
-    vec3 viewDir = normalize(-viewPos);
-    vec3 normal = getSSRWaterNormal(uv, frameTimeCounter);
-    vec3 rayDir = reflect(viewDir, normal);
+    vec3 incidentDir = normalize(viewPos);
+    vec3 viewDir = -incidentDir;
+    vec3 worldWaveNormal = getSSRWaterNormal(uv, frameTimeCounter, worldNormal);
+    vec3 normal = normalize((modelView * vec4(worldWaveNormal, 0.0)).xyz);
+    // Face the camera so views from below the surface still reflect away from the eye.
+    normal = faceforward(normal, incidentDir, normal);
+    vec3 rayDir = reflect(incidentDir, normal);
     float fresnel = pow(1.0 - clamp(dot(viewDir, normal), 0.0, 1.0), 2.0);
     float horizontalWater = 1.0 - verticalWater;
-    float roughness = clamp(0.42 + rainStrength * 0.34 + length(normal.xy) * 1.35 + waterfallMask * 0.36, 0.30, 1.0);
+    float rippleTilt = length(worldWaveNormal.xz);
+    float roughness = clamp(0.42 + rainStrength * 0.34 + rippleTilt * 1.35 + waterfallMask * 0.36, 0.30, 1.0);
 
     if (rayDir.z > -0.02) {
         float fallbackAmount = mask * intensity * mix(0.82, 1.0, fresnel) * horizontalWater;
