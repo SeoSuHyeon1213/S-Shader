@@ -12,7 +12,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 하는 Minecraft 셰이더팩이�
 |---|---|
 | `shaders/gbuffers_*.vsh`, `*.fsh` | 지형·물·손·엔티티·하늘·구름 패스 |
 | `shaders/shadow.vsh/fsh` | shadow caster와 alpha cutout |
-| `shaders/composite.vsh/fsh` | bloom 추출·blur 및 장면·재질·노멀 버퍼 전달 |
+| `shaders/composite.vsh/fsh` | bloom 추출·가로 blur 및 장면·재질·노멀 버퍼 전달 |
+| `shaders/composite1.vsh/fsh` | bloom·용암 halo 세로 blur |
 | `shaders/final.vsh/fsh` | 조명·젖은 표면·물·안개·색 보정의 최종 합성 |
 | `shaders/lib/*.glsl` | 색 보정, 하늘, 안개, 조명, 그림자, wet/SSR 공통 함수 |
 | `shaders/shaders.properties` | 버퍼 형식, 그림자 설정, 옵션 화면과 슬라이더 |
@@ -67,6 +68,7 @@ Unity·npm 프로젝트의 설치나 빌드 절차를 가정하지 않는다. �
 | `colortex1` | bloom 버퍼 |
 | `colortex2.r/g/b/a` | wet floor / wall / lava / water 마스크 |
 | `colortex3.rgb/a` | 0–1 범위로 인코딩된 world normal / 유효 normal 마스크 |
+| `colortex4.rgb` | composite → composite1 용암 halo 가로 blur 중간값. final에서 읽지 않는다. |
 
 - 버퍼 계약 변경 시 작성 패스, composite 전달, final/lib 소비 코드와 `shaders.properties`의 형식을 함께 확인한다.
 - `DRAWBUFFERS:023`에서 `gl_FragData[1]`은 `colortex2`, `gl_FragData[2]`는 `colortex3`에 대응한다. 배열 인덱스를 버퍼 번호로 오해하지 않는다.

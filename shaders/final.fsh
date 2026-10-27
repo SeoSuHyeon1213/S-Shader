@@ -14,6 +14,7 @@ uniform float near;
 uniform float far;
 uniform float rainStrength;
 uniform float frameTimeCounter;
+uniform float sunAngle;
 uniform int worldTime;
 uniform int heldBlockLightValue;
 uniform int heldBlockLightValue2;
@@ -130,7 +131,7 @@ void main() {
     // Material response is not receiver opacity: even low-wetness terrain receives shadows.
     float terrainReceiverMask = step(0.001, max(max(terrainWetMask, terrainWallMask), max(lavaMask, waterMask)));
     float terrainSceneMask = sceneMask * terrainReceiverMask;
-    float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask, worldTime, rainStrength);
+    float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask, rainStrength);
     float rainExposure = 1.0;
     if (rainStrength > 0.001) {
         rainExposure = getRainExposure(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask);

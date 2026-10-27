@@ -298,3 +298,32 @@
 - [x] Goals와 Material IDs는 README에 없는 내용이라 유지했다. Material IDs는 `block.properties`의 11000–11105와 일치한다.
 - [x] Planned는 체크리스트 P1·P2·별도 연구 과제와 겹치는 항목을 빼고, 이 체크리스트를 가리키는 안내와 남은 장기 계획 3개만 남겼다.
 - 검증: README의 옵션 26개(`#define` 25개와 `shadowDistance`)가 소스와 일치하고, 참조한 README 절 제목과 체크리스트 섹션 제목이 존재함을 확인했다. `git diff --check`를 실행했다.
+
+## 2026-10-27 - bloom 2패스 분리와 광원 고도 기반 그림자 페이드
+
+### 목표와 구현
+
+- 목표는 bloom의 텍스처 읽기를 같은 결과로 줄이고, 그림자 강도를 시각 구간 대신 실제 광원 고도에 맞추는 것이다.
+- [x] `composite`는 가로 5탭 bloom을 `colortex1`에, 가로 3탭 용암 halo를 새 `colortex4`(RGBA16F)에 쓴다. 새 `composite1`이 세로 blur와 `BLOOM_CLAMP`를 적용해 `colortex1`에 쓴다. 공통 커널은 `lib/bloom.glsl`로 옮겼다.
+- [x] 용암 halo의 화면 밖 샘플 제외 조건을 가로·세로 패스에서 각각 검사해, 기존 2D 조건과 같은 결과가 되게 했다.
+- [x] `getShadowDayFactor(worldTime)`를 `getShadowLightFade()`로 바꿨다. 광원 world Y 0.02–0.20에서 smoothstep으로 페이드하고, `sunAngle >= 0.5`(달)이면 0.42배다. 페이드가 0이면 그림자 샘플링을 건너뛴다. 사용하지 않게 된 `worldTime` 인수는 `getShadowVisibility`에서 뺐다.
+- [x] `wet.glsl`의 지역 변수 `sunAngle`이 새 uniform을 가리지 않도록 `sunOrbitAngle`로 바꿨다.
+- [x] README의 버퍼·용암 샘플 수·그림자 상태, AGENTS의 경로·버퍼 표, CHANGELOG를 갱신했다.
+
+### 검증 기록
+
+| 확인 항목 | 명령 또는 방법 | 결과 | 미실행·실패 이유 |
+|---|---|---|---|
+| bloom 결과 동일성 | 97×61 무작위 장면·용암 마스크에서 기존 단일 패스와 H/V 분리를 Python으로 비교 | 통과, 최대 차이 2.2e-16 | 게임의 RGBA16F 중간값 반올림은 포함하지 않음 |
+| 읽기 수 | 코드 기준 집계 | bloom 관련 68회 → 24회(전달 3회 별도) | GPU 시간은 미측정 |
+| 그림자 페이드 | 단순화한 해 경로(Minecraft의 천체 easing 무시)에서 기존·새 계수 비교 | 해·달 전환 시 0, 낮 1.0, 밤 0.42 확인. 이른 아침은 강해지고 일몰 전 1시간은 약해짐 | 실제 `sunAngle`·광원 방향은 런타임 확인 필요 |
+| 정적 연결 | grep으로 include·DRAWBUFFERS·옵션 정의 일치·호출 인수·이전 함수 잔존 여부, 괄호 수 확인 | 통과 | 셰이더 컴파일 아님 |
+| 형식 | `git diff --check` | 통과(LF/CRLF 안내만) | — |
+| 게임 컴파일·화면·FPS | — | 미실행 | 이 PC에 Minecraft·Iris와 `glslangValidator`·`glslc`가 없음 |
+
+### 남은 확인
+
+- [ ] Iris/NeOculus에서 `composite1`과 `colortex4`가 정상 할당·컴파일되는지 로그로 확인한다.
+- [ ] 용암·햇빛 bloom을 변경 전 커밋과 같은 장면에서 비교하고 FPS를 측정한다.
+- [ ] 일출·일몰·달 전환 시점의 그림자 강도 변화와 낮은 광원의 줄무늬 그림자가 줄었는지 확인한다. 페이드 구간(0.02–0.20)은 이 비교 뒤 조정한다.
+- composite의 colortex0/2/3 그대로 전달(읽기 3회·쓰기 3회)은 이번 범위에서 유지했다. 쓰지 않아도 값이 남는 로더 동작을 게임에서 확인한 뒤 제거를 검토한다.

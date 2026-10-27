@@ -126,8 +126,9 @@ vec3 sampleWetTerrainRoughReflection(sampler2D sceneTexture, vec2 uv, vec2 refle
 
 vec3 getWetLightDirection(int worldTime) {
     float time = mod(float(worldTime), 24000.0);
-    float sunAngle = (time - 6000.0) / 24000.0 * 6.2831853;
-    vec3 sunDir = normalize(vec3(sin(sunAngle), cos(sunAngle), 0.22));
+    // Named apart from the sunAngle uniform that final.fsh declares for shadow fading.
+    float sunOrbitAngle = (time - 6000.0) / 24000.0 * 6.2831853;
+    vec3 sunDir = normalize(vec3(sin(sunOrbitAngle), cos(sunOrbitAngle), 0.22));
     vec3 moonDir = -sunDir;
     float dayMask = getDayMask(worldTime);
     return normalize(mix(moonDir, sunDir, dayMask));

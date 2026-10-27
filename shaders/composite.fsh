@@ -8,32 +8,25 @@ uniform sampler2D colortex3; // encoded world normals
 uniform float viewWidth;
 uniform float viewHeight;
 
-/* DRAWBUFFERS:0123 */
+#include "/lib/bloom.glsl"
+
+/* DRAWBUFFERS:01234 */
 
 // Buffer formats are loader directives; keep each one alone on its line inside the block comment.
 // colortex0 = scene color, colortex1 = bloom (16F reduces blur banding),
-// colortex2 = floor/wall/lava/water masks, colortex3 = encoded world normal + valid mask.
+// colortex2 = floor/wall/lava/water masks, colortex3 = encoded world normal + valid mask,
+// colortex4 = horizontal lava halo between composite and composite1.
 /*
 const int colortex0Format = RGBA8;
 const int colortex1Format = RGBA16F;
 const int colortex2Format = RGBA8;
 const int colortex3Format = RGBA16F;
+const int colortex4Format = RGBA16F;
 */
 
 #define BLOOM_THRESHOLD 0.8 // Bloom threshold [0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.4 1.6]
 #define LAVA_EMISSION_INTENSITY 1.0 // Lava emission strength [0.0 0.5 0.75 1.0 1.25 1.5 2.0]
 const float BLOOM_KNEE      = 0.2;
-const float BLOOM_SPREAD    = 4.0; // texel multiplier
-const float BLOOM_CLAMP     = 8.0;
-const vec3 LAVA_BLOOM_COLOR = vec3(1.000, 0.227, 0.125);
-const float LAVA_BLOOM_STRENGTH = 1.35;
-const float LAVA_GLOW_SPREAD = 18.0;
-
-float gaussianWeight(int offset) {
-    if (offset == 0) return 0.4026;
-    if (offset == -1 || offset == 1) return 0.2442;
-    return 0.0545;
-}
 
 vec3 brightPass(vec2 uv) {
     vec3 color = texture2D(colortex0, uv).rgb;
@@ -45,40 +38,36 @@ vec3 brightPass(vec2 uv) {
     return max(sceneBloom, lavaBloom);
 }
 
-vec3 blurBloom(vec2 uv) {
-    vec2 texel = vec2(1.0 / viewWidth, 1.0 / viewHeight);
+// Horizontal half of the separable 5x5 bloom; composite1 applies the vertical half.
+vec3 blurBloomHorizontal(vec2 uv) {
+    float texelX = 1.0 / viewWidth;
     vec3 result = vec3(0.0);
 
     for (int x = -2; x <= 2; x++) {
-        for (int y = -2; y <= 2; y++) {
-            vec2 offset = vec2(float(x), float(y)) * texel * BLOOM_SPREAD;
-            float weight = gaussianWeight(x) * gaussianWeight(y);
-
-            result += brightPass(uv + offset) * weight;
-        }
+        result += brightPass(uv + vec2(float(x) * texelX * BLOOM_SPREAD, 0.0)) * gaussianWeight(x);
     }
+    return result;
+}
 
-    // A separate nine-tap halo widens only lava glow, keeping scene bloom sharp.
-    if (LAVA_EMISSION_INTENSITY > 0.0) {
-        for (int x = -1; x <= 1; x++) {
-            for (int y = -1; y <= 1; y++) {
-                vec2 sampleUv = uv + vec2(float(x), float(y)) * texel * LAVA_GLOW_SPREAD;
-                if (sampleUv.x < 0.0 || sampleUv.x > 1.0 || sampleUv.y < 0.0 || sampleUv.y > 1.0) continue;
-                float lavaMask = texture2D(colortex2, sampleUv).b;
-                vec3 lavaColor = texture2D(colortex0, sampleUv).rgb;
-                float weightX = x == 0 ? 0.5 : 0.25;
-                float weightY = y == 0 ? 0.5 : 0.25;
-                result += mix(lavaColor, LAVA_BLOOM_COLOR, 0.58) * lavaMask *
-                          weightX * weightY * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY * 0.65;
-            }
-        }
+// Horizontal half of the wide lava-only halo, kept apart because its spread differs.
+vec3 blurLavaGlowHorizontal(vec2 uv) {
+    vec3 result = vec3(0.0);
+    if (LAVA_EMISSION_INTENSITY <= 0.0) return result;
+
+    float texelX = 1.0 / viewWidth;
+    for (int x = -1; x <= 1; x++) {
+        vec2 sampleUv = uv + vec2(float(x) * texelX * LAVA_GLOW_SPREAD, 0.0);
+        float lavaMask = texture2D(colortex2, sampleUv).b;
+        vec3 lavaColor = texture2D(colortex0, sampleUv).rgb;
+        result += mix(lavaColor, LAVA_BLOOM_COLOR, 0.58) * lavaMask * lavaGlowWeight(x) * isBloomUvInside(sampleUv);
     }
-    return min(result, vec3(BLOOM_CLAMP));
+    return result * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY * LAVA_GLOW_SCALE;
 }
 
 void main() {
     gl_FragData[0] = texture2D(colortex0, texCoord); // pass scene color through
-    gl_FragData[1] = vec4(blurBloom(texCoord), 1.0);  // blurred bloom buffer
+    gl_FragData[1] = vec4(blurBloomHorizontal(texCoord), 1.0); // horizontal bloom
     gl_FragData[2] = texture2D(colortex2, texCoord); // pass terrain masks through
     gl_FragData[3] = texture2D(colortex3, texCoord); // pass encoded world normals through
+    gl_FragData[4] = vec4(blurLavaGlowHorizontal(texCoord), 1.0); // horizontal lava halo
 }

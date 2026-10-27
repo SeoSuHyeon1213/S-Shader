@@ -82,8 +82,11 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `colortex2.a`: water mask
 - `colortex3.rgb`: encoded world normal
 - `colortex3.a`: valid normal mask
+- `colortex4.rgb`: composite에서 composite1로 넘기는 용암 halo 가로 blur 중간값
 
-버퍼 형식(`colortex0` RGBA8, `colortex1` RGBA16F, `colortex2` RGBA8, `colortex3` RGBA16F)은 `composite.fsh`의 블록 주석 안에 로더 지시문으로 선언합니다. `shaders.properties`의 `colortexNFormat` 키는 로더가 읽지 않으므로 사용하지 않습니다.
+bloom은 `composite`에서 가로, `composite1`에서 세로로 나눠 blur합니다. 결과는 기존 5×5 bloom·3×3 용암 halo와 같고, bloom 관련 텍스처 읽기는 픽셀당 68회에서 24회로 줄었습니다.
+
+버퍼 형식(`colortex0` RGBA8, `colortex1` RGBA16F, `colortex2` RGBA8, `colortex3` RGBA16F, `colortex4` RGBA16F)은 `composite.fsh`의 블록 주석 안에 로더 지시문으로 선언합니다. `shaders.properties`의 `colortexNFormat` 키는 로더가 읽지 않으므로 사용하지 않습니다.
 
 ## Sky / Fog Layout
 
@@ -110,6 +113,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - 화면 미분 대신 world normal과 실제 광원 방향·투영 크기로 제한된 slope bias 계산
 - 낮은 wet response 재질도 그림자를 받도록 receiver 존재 여부와 wet response 강도 분리
 - shadow tint와 rain/weather fade
+- 시각 구간 대신 실제 광원(해/달) 고도로 그림자 강도를 줄여, 광원이 지평선에 가까울 때와 해·달 전환 시점에 그림자가 0이 되도록 함. 달 그림자는 0.42배
 - screen-space contact shadow
 - normal buffer 기반 terrain form lighting
 - shadow pass의 기본 alpha cutout 및 water/lava caster 제외
@@ -180,7 +184,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 
 - `LAVA_EMISSION_INTENSITY`는 `0.0`부터 `2.0`까지 조절합니다. `0.0`은 추가 자체 발광과 전용 bloom을 끄며, 용암의 기본 자체 조명과 일반 bloom은 유지됩니다.
 - `BLOOM_INTENSITY`는 용암을 포함한 전체 bloom의 최종 합성 강도입니다. `0.0`이면 빛 번짐만 꺼지고 용암 자체 발광은 유지됩니다.
-- 용암 전용 halo는 화면 픽셀 기준이며, 활성화 시 composite에 최대 18회의 texture sampling이 추가됩니다. 해상도·장면에 따른 시각 품질과 성능은 게임에서 확인해야 합니다.
+- 용암 전용 halo는 화면 픽셀 기준이며, 활성화 시 composite에 6회, composite1에 3회의 texture sampling이 추가됩니다. 해상도·장면에 따른 시각 품질과 성능은 게임에서 확인해야 합니다.
 
 ## Crash / Stability Debug
 

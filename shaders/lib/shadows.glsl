@@ -26,19 +26,21 @@ const float PCSS_MIN_RADIUS = 0.65;
 const float PCSS_MAX_RADIUS = 2.8;
 const float RAIN_EXPOSURE_MIN = 0.08;
 
-float getShadowDayFactor(int worldTime) {
-    float time = mod(float(worldTime), 24000.0);
-    float sunrise = smoothstep(0.0, 3000.0, time);
-    float sunset = 1.0 - smoothstep(12000.0, 13500.0, time);
-    float dayMask = sunrise * sunset;
-
-    // Moon shadows stay subtle so night scenes keep readability.
-    return max(dayMask, (1.0 - dayMask) * 0.42);
-}
+const float SHADOW_MOON_STRENGTH = 0.42;
+const float SHADOW_HORIZON_FADE_START = 0.02; // light direction world Y
+const float SHADOW_HORIZON_FADE_END = 0.20;
 
 vec3 getShadowLightDirection() {
     // The light-view Z row points toward the sun/moon in world space.
     return normalize(vec3(shadowModelView[0].z, shadowModelView[1].z, shadowModelView[2].z));
+}
+
+float getShadowLightFade() {
+    // Fade by the actual light elevation, so grazing light near the sun/moon switch casts no streaks.
+    float elevationFade = smoothstep(SHADOW_HORIZON_FADE_START, SHADOW_HORIZON_FADE_END, getShadowLightDirection().y);
+    // sunAngle below 0.5 means the sun is the shadow light. Moon shadows stay subtle for night readability.
+    float lightStrength = sunAngle < 0.5 ? 1.0 : SHADOW_MOON_STRENGTH;
+    return elevationFade * lightStrength;
 }
 
 float getShadowBias(vec3 worldNormal, float normalMask) {
@@ -166,10 +168,11 @@ float getShadowVisibility(
     float sceneMask,
     vec3 worldNormal,
     float normalMask,
-    int worldTime,
     float rainStrength
 ) {
     if (sceneMask < 0.5) return 1.0;
+    float lightFade = getShadowLightFade();
+    if (lightFade <= 0.0) return 1.0;
 
     vec4 shadowClip = shadowProjection * shadowModelView * vec4(worldPos, 1.0);
     vec3 shadowPos = shadowClip.xyz / shadowClip.w;
@@ -191,8 +194,7 @@ float getShadowVisibility(
 
     float edgeFade = getShadowEdgeFade(shadowPos);
     float weatherFade = 1.0 - clamp(rainStrength, 0.0, 1.0) * 0.55;
-    float timeFade = getShadowDayFactor(worldTime);
-    float shadowStrength = edgeFade * weatherFade * timeFade;
+    float shadowStrength = edgeFade * weatherFade * lightFade;
 
     return mix(1.0, visibility, shadowStrength);
 }

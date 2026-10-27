@@ -4,6 +4,18 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-27 - Separable Bloom and Light-Elevation Shadow Fade
+
+### Changed
+
+- Split the 5x5 scene bloom and the 3x3 lava halo into a horizontal `composite` pass and a vertical `composite1` pass, with shared kernels in `lib/bloom.glsl`. The lava halo's horizontal result goes through a new `colortex4` (RGBA16F). Bloom texture reads drop from 68 to 24 per pixel, and the output matches the single-pass kernel.
+- Replaced the `worldTime`-window shadow day factor with a fade driven by the shadow light's world-space elevation. Shadows reach 0 as the sun or moon nears the horizon, including at the sun/moon switch, and the moon keeps 0.42x strength via `sunAngle`. Shadow sampling is skipped when the fade is 0.
+- Renamed a local `sunAngle` in `getWetLightDirection()` so it no longer hides the new uniform.
+
+### Test Notes
+
+- A numeric comparison on a 97x61 random image matched the old bloom within 2.2e-16 (excluding RGBA16F intermediate rounding in game). On a simplified sun path, the new fade is stronger in the early morning and weaker in the last hour before sunset than the old time window. In-game compilation, visuals and FPS remain unverified.
+
 ## 2026-10-19 - No Sky Mirror on the Underwater Surface
 
 ### Fixed
