@@ -37,10 +37,12 @@ uniform mat4 shadowProjection;
 #include "/lib/ssr.glsl"
 
 // ---- Color Grading ----
-#define EXPOSURE 0.05 // Exposure (EV stops) [-2.0 -1.75 -1.5 -1.25 -1.0 -0.75 -0.5 -0.25 0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
-#define CONTRAST 0.88 // Contrast [0.75 0.8 0.85 0.88 0.9 0.95 1.0 1.05 1.1 1.15 1.2 1.25 1.3 1.4]
-#define SATURATION 0.936 // Saturation [0.5 0.6 0.7 0.72 0.8 0.9 0.936 1.0 1.1 1.2 1.3 1.4 1.5]
+#define EXPOSURE -0.25 // Exposure (EV stops) [-2.0 -1.75 -1.5 -1.25 -1.0 -0.75 -0.5 -0.25 0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
+#define CONTRAST 1.05 // Contrast [0.75 0.8 0.85 0.88 0.9 0.95 1.0 1.05 1.1 1.15 1.2 1.25 1.3 1.4]
+#define SATURATION 1.0 // Saturation [0.5 0.6 0.7 0.72 0.8 0.9 0.936 1.0 1.1 1.2 1.3 1.4 1.5]
 const vec3  COLOR_TINT = vec3(1.03, 1.015, 0.99); // soft pastel warmth
+// Scene level that tonemaps to full white; above 1.0 so bloom and emission keep some highlight roll-off.
+const float TONEMAP_WHITE_INPUT = 1.25;
 
 // ---- Vignette ----
 const float VIGNETTE_INNER = 0.4;
@@ -202,7 +204,9 @@ void main() {
     color = colorBalance(color, COLOR_TINT);
     color = adjustContrast(color, CONTRAST);
     color = adjustSaturation(color, SATURATION);
-    color = tonemapACES(color);
+    // Grade the white level like the scene, so exposure and contrast never bring back the old white cap.
+    float toneWhite = adjustContrast(adjustExposure(vec3(TONEMAP_WHITE_INPUT), EXPOSURE), CONTRAST).r;
+    color = tonemapACES(color, toneWhite);
     color = applyPastelTone(color);
 
     // Vignette

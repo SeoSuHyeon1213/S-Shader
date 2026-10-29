@@ -4,6 +4,8 @@
 
 #define SHADOW_MODE 0 // Shadow filter mode: 0 = stable Poisson PCF, 1 = experimental PCSS [0 1]
 
+#define SHADOW_STRENGTH 1.0 // Cast shadow darkness multiplier [0.0 0.25 0.5 0.75 0.9 1.0 1.1 1.2 1.3]
+
 const float SHADOW_DARKNESS = 0.94;
 const float SHADOW_FADE_START = 0.58;
 const float SHADOW_BIAS_TEXELS = 0.6;
@@ -326,5 +328,7 @@ vec3 applyShadow(
     float shadowAmount = (1.0 - visibility) * SHADOW_DARKNESS * darkSurfaceProtection * materialStrength;
     vec3 stableSkyDir = getStableShadowSkyDirection();
     vec3 shadowTint = getMaterialShadowTint(getSkyShadowTint(stableSkyDir, worldTime, rainStrength), terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask, worldTime, rainStrength);
-    return mix(color, color * shadowTint * 0.62, shadowAmount);
+    vec3 shadowFactor = mix(vec3(1.0), shadowTint * 0.62, shadowAmount);
+    // A power keeps strengths above 1.0 darkening smoothly instead of saturating the blend amount.
+    return color * pow(shadowFactor, vec3(SHADOW_STRENGTH));
 }

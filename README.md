@@ -54,9 +54,12 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `ENABLE_WET_SCREEN_REFLECTIONS`: 젖은 바닥 screen-space reflection on/off
 - `ENABLE_WET_SPECULAR`: normal buffer와 material response 기반 젖은 표면 BRDF 하이라이트 on/off
 - `ENABLE_WATER_SURFACE`: 물 Fresnel/flow surface shading on/off
-- `EXPOSURE`
-- `CONTRAST`
-- `SATURATION`
+- `SHADOW_STRENGTH`: 그림자 진하기 배율, 기본값 `1.0`. `0.0`은 그림자 어둡게 하기를 끄고, `1.0`보다 크면 그림자 계수에 거듭제곱을 적용해 더 어둡게 합니다.
+- `EXPOSURE`: 기본값 `-0.25`
+- `CONTRAST`: 기본값 `1.05`
+- `SATURATION`: 기본값 `1.0`
+
+색 보정 결과는 ACES 톤 매핑으로 압축됩니다. 장면 값은 HDR이 아닌 0~1 표시 색이라, ACES만 쓰면 흰색이 약 0.81에서 멈춥니다. 그래서 장면 값 `1.25`가 흰색 1.0이 되도록 정규화합니다. 이 흰색 기준도 `EXPOSURE`·`CONTRAST`로 같이 보정되므로, 옵션을 바꿔도 흰색이 다시 회색으로 눌리지 않습니다. 기존 옵션 파일에 `EXPOSURE`·`CONTRAST`·`SATURATION`이 저장되어 있으면 새 기본값이 적용되지 않으므로, 옵션 화면에서 기본값으로 되돌린 뒤 비교합니다.
 - `LIGHTING_STRENGTH`
 - `DAY_LIGHT_STRENGTH`
 - `NIGHT_LIGHT_STRENGTH`

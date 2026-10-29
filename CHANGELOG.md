@@ -4,6 +4,18 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-29 - Tone Curve Contrast and Shadow Strength Option
+
+### Changed
+
+- ACES now normalizes by a graded white level (scene value `1.25`), because the scene is 0-1 display color rather than HDR. Previously input 1.0 stopped near 0.81, and contrast 0.88 lifted black to about 0.06, so a test on another PC looked bright and washed out.
+- Changed the defaults to `EXPOSURE` -0.25 (from 0.05), `CONTRAST` 1.05 (from 0.88) and `SATURATION` 1.0 (from 0.936). The pastel tone now keeps 96% chroma and blends 4% cream into highlights (previously 92% and 8%).
+- Added a `SHADOW_STRENGTH` option (default 1.0, range 0.0-1.3). It raises the cast-shadow factor to a power, so values above 1.0 keep darkening smoothly without saturating the blend.
+
+### Test Notes
+
+- Gray-ramp calculation (old to new): 0.00 to 0.06/0.00, 0.08 to 0.18/0.05, 0.25 to 0.43/0.36, 0.55 to 0.67/0.73, 1.00 to 0.81/0.94. Near-black inputs up to about 0.03 now map to 0, so cave and night readability needs an in-game check. Saved option values override the new defaults.
+
 ## 2026-10-27 - Separable Bloom and Light-Elevation Shadow Fade
 
 ### Changed
