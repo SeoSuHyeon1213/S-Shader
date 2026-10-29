@@ -4,6 +4,21 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-29 - Waving Leaves and Plants
+
+### Added
+
+- Wind sway for leaves, grass, flowers, ferns, tall plants and crops, with `WAVING_PLANTS` (on/off) and `WAVING_STRENGTH` options. The offset is a function of world position and time, so shared vertices between neighbouring blocks move together. Plants bend from a still base, and the upper half of a tall plant continues the lower half's top offset. Rain strengthens the sway by up to 60%.
+- `shadow.vsh` applies the same offset so cast shadows follow the motion.
+
+### Changed
+
+- Moved leaves to 11106, and grass/ferns/flowers/lower tall-plant halves to 11107, upper halves to 11108, keeping the foliage wet response and shadow caster opacity. Flowers were previously uncategorized and now use the foliage wet response.
+
+### Test Notes
+
+- Numeric checks: the anchored base offset is 0, and the seam between tall-plant halves is 0. Peak offsets in full rain at strength 1.0 are about 0.09 (leaves), 0.18 (one-block plants) and 0.36 blocks (tall plant tops). Block-state syntax (`half=upper`), version-specific names, compilation, visuals and FPS remain unverified in game.
+
 ## 2026-10-29 - Tone Curve Contrast and Shadow Strength Option
 
 ### Changed
@@ -496,9 +511,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - `block.11100`: stone-like wet response group.
 - `block.11101`: soil/grass/sand/gravel wet response group.
 - `block.11102`: wood wet response group.
-- `block.11103`: foliage/moss/grass wet response group.
+- `block.11103`: moss/vine/lichen foliage wet response group (non-waving).
 - `block.11104`: glass wet response group.
-- `block.11105`: crops/small plants low-reflection group.
+- `block.11105`: crops/small plants low-reflection group; sways from a still base.
+- `block.11106`: waving leaves (foliage wet response).
+- `block.11107`: waving grass, flowers and lower halves of tall plants (foliage wet response).
+- `block.11108`: waving upper halves of tall plants (foliage wet response).
 
 ## Planned / Not Implemented
 

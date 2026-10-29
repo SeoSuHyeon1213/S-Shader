@@ -30,6 +30,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - shadow map 기반 PCF/PCSS 그림자, shadow tint, contact shadow
 - `colortex3` normal buffer 기반 지형 diffuse/form shadow 보정
 - hand/entity 전용 pass를 통한 들고 있는 아이템 반투명 문제 완화
+- 나뭇잎·풀·꽃·작물의 바람 흔들림. 그림자도 같은 움직임을 따름
 
 ## 주요 색상 팔레트
 
@@ -55,6 +56,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `ENABLE_WET_SPECULAR`: normal buffer와 material response 기반 젖은 표면 BRDF 하이라이트 on/off
 - `ENABLE_WATER_SURFACE`: 물 Fresnel/flow surface shading on/off
 - `SHADOW_STRENGTH`: 그림자 진하기 배율, 기본값 `1.0`. `0.0`은 그림자 어둡게 하기를 끄고, `1.0`보다 크면 그림자 계수에 거듭제곱을 적용해 더 어둡게 합니다.
+- `WAVING_PLANTS`: 나뭇잎·풀·꽃·작물 바람 흔들림 on/off, 기본값 `1`
+- `WAVING_STRENGTH`: 흔들림 크기 배율, 기본값 `1.0`. 기본값에서 비가 올 때 최대 이동은 나뭇잎 약 0.09블록, 한 칸 식물 끝 약 0.18블록, 두 칸 식물 끝 약 0.36블록입니다.
 - `EXPOSURE`: 기본값 `-0.25`
 - `CONTRAST`: 기본값 `1.05`
 - `SATURATION`: 기본값 `1.0`
