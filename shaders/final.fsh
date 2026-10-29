@@ -116,6 +116,12 @@ void main() {
     vec3 viewPos = getViewPosition(texCoord, depth);
     vec3 worldPos = getWorldPosition(viewPos);
     vec3 worldDir = getWorldDirection(viewPos);
+    // Terrain seen through stained glass or ice keeps its masks, so look up its shadow on that terrain, not on the glass.
+    float opaqueDepth = texture2D(depthtex1, texCoord).r;
+    vec3 receiverWorldPos = worldPos;
+    if (waterMask < 0.001 && opaqueDepth > depth && opaqueDepth < 1.0) {
+        receiverWorldPos = getWorldPosition(getViewPosition(texCoord, opaqueDepth));
+    }
     float waterDepthFactor = 0.0;
     float waterReflectionIntensity = WATER_REFLECTION_INTENSITY;
     float verticalWaterMask = smoothstep(0.30, 0.86, 1.0 - abs(worldNormal.y));
@@ -133,10 +139,10 @@ void main() {
     // Material response is not receiver opacity: even low-wetness terrain receives shadows.
     float terrainReceiverMask = step(0.001, max(max(terrainWetMask, terrainWallMask), max(lavaMask, waterMask)));
     float terrainSceneMask = sceneMask * terrainReceiverMask;
-    float shadowVisibility = getShadowVisibility(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask, rainStrength);
+    float shadowVisibility = getShadowVisibility(receiverWorldPos, dist, far, terrainSceneMask, worldNormal, normalMask, rainStrength);
     float rainExposure = 1.0;
     if (rainStrength > 0.001) {
-        rainExposure = getRainExposure(worldPos, dist, far, terrainSceneMask, worldNormal, normalMask);
+        rainExposure = getRainExposure(receiverWorldPos, dist, far, terrainSceneMask, worldNormal, normalMask);
     }
     float surfaceRainStrength = rainStrength * rainExposure;
     color = applyShadow(color, shadowVisibility, terrainSceneMask, worldTime, rainStrength, terrainWetMask, terrainWallMask, lavaMask, waterMask, worldNormal, normalMask);

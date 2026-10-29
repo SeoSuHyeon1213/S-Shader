@@ -4,6 +4,17 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-29 - Keep Terrain Data Behind Stained Glass and Ice
+
+### Fixed
+
+- `gbuffers_water` also draws non-water translucents such as stained glass and ice. With blending off for `colortex2`/`colortex3`, those fragments overwrote the terrain behind them with empty masks and an invalid normal. That terrain then lost shadows and wet-surface effects. The buffers now blend by alpha as an ownership flag: water writes 1 and replaces the opaque data, other translucents write 0 and keep it.
+- Shadow and rain-exposure lookups for terrain seen through a non-water translucent use the opaque `depthtex1` position instead of the glass surface.
+
+### Test Notes
+
+- A blend simulation of water/glass over terrain and both draw orders gave the expected owner. In-game compilation and visuals are unverified. `gbuffers_hand_water` still writes zero-alpha masks under default blending and may not clear terrain data behind held translucent items.
+
 ## 2026-10-29 - Waving Leaves and Plants
 
 ### Added

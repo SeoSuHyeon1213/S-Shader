@@ -380,3 +380,27 @@
 - [ ] Iris/NeOculus 로그에서 `minecraft:tall_grass:half=upper` 같은 블록 상태 문법과 `grass`/`short_grass`·`pale_oak_leaves`의 알 수 없는 블록 경고를 확인한다.
 - [ ] 나뭇잎 숲, 풀밭, 꽃밭, 두 칸 식물, 작물밭에서 흔들림과 이음매, 그림자 추적, 비 올 때의 세기와 FPS를 확인한다.
 - [ ] 흔들림이 크거나 작으면 `WAVING_STRENGTH`로 비교한 뒤 기본 진폭(0.030/0.060)을 조정한다.
+
+## 2026-10-29 - 색유리·얼음 뒤 지형의 마스크·normal 보존
+
+### 근거와 구현
+
+- 정적 근거: Iris는 색유리·얼음 같은 물이 아닌 반투명 블록도 `gbuffers_water`로 그린다. 이 패스는 `colortex2`·`colortex3` blending을 끈 채 `vec4(0, 0, 0, 0)`·`alpha 0`을 썼다. 그래서 뒤 지형의 재질 마스크와 normal이 지워져 그림자·젖은 표면·form lighting이 빠졌다.
+- [x] `shaders.properties`에서 두 버퍼의 blend를 `SRC_ALPHA ONE_MINUS_SRC_ALPHA ONE ONE_MINUS_SRC_ALPHA`로 바꿨다. 물은 alpha 1로 교체하고, 물이 아닌 반투명은 alpha 0으로 뒤 데이터를 보존한다. 보간 오차를 막으려고 `step(0.5, isWater)`로 정확한 0/1을 쓴다.
+- [x] `final.fsh`는 물이 아닌 반투명 뒤 지형의 그림자·비 노출 위치를 `depthtex1`의 불투명 지형 위치로 계산한다. 물 픽셀과 하늘 배경은 기존과 같다.
+- [x] README의 물 데이터 설명, AGENTS의 버퍼 규칙, CHANGELOG를 갱신했다.
+
+### 검증 기록
+
+| 확인 항목 | 명령 또는 방법 | 결과 | 미실행·실패 이유 |
+|---|---|---|---|
+| blend 소유 | Python으로 물/유리 위 지형, 유리↔물 두 그리기 순서를 시뮬레이션 | 4가지 모두 기대한 소유자와 일치 | 로더의 실제 기본 blend 동작은 게임에서 확인 필요 |
+| 정적 연결 | grep으로 `receiverWorldPos` 사용처·blend 키 확인 | 통과 | 셰이더 컴파일 아님 |
+| 형식 | `git diff --check` | 통과(LF/CRLF 안내만) | — |
+| 게임 화면·컴파일 | — | 미실행 | 이 PC에 Minecraft·Iris와 GLSL 컴파일러가 없음 |
+
+### 남은 확인
+
+- [ ] 로더 로그에서 `blend.gbuffers_water.colortex2/3` 4인자 설정이 인식되는지 확인한다.
+- [ ] 색유리 창·얼음 뒤 지형의 그림자·비 효과, 물 위 색유리, 색유리 너머 물을 비교한다.
+- [ ] 후속: `gbuffers_hand_water`도 기본 blending에서 alpha 0 마스크를 써서, 손에 든 반투명 아이템 뒤 지형 데이터를 지우지 못할 수 있다. 게임에서 재현을 확인한 뒤 별도로 다룬다.

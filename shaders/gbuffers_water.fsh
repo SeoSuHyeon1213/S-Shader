@@ -93,8 +93,10 @@ void main() {
     gl_FragData[0] = vec4(outColor, outAlpha);
 
     // colortex2 material masks: R = wet floor, G = wall, B = lava, A = water.
-    gl_FragData[1] = vec4(0.0, 0.0, 0.0, isWater);
+    // Alpha doubles as the blend weight: 1 replaces the opaque data, 0 keeps it (see shaders.properties).
+    float waterOwner = step(0.5, isWater);
+    gl_FragData[1] = vec4(0.0, 0.0, 0.0, waterOwner);
 
     vec3 encodedNormal = normalize(worldWaterNormal) * 0.5 + 0.5;
-    gl_FragData[2] = vec4(encodedNormal, isWater);
+    gl_FragData[2] = vec4(encodedNormal, waterOwner);
 }
