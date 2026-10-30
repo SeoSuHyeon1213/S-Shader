@@ -4,6 +4,16 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-30 - Opaque First-Person Arm and Entities
+
+### Fixed
+
+- On Minecraft 26.x the first-person arm uses a translucent render type, so Iris draws it in `gbuffers_hand` with blending on. The pass's zero-alpha masks then left the terrain masks behind the arm in place, and `final.fsh` shaded the arm as that terrain: ground shadows, lava glow and wet effects showed through, so the arm looked see-through. Blending is now off for `colortex2`/`colortex3` in `gbuffers_hand`, `gbuffers_hand_water` and `gbuffers_entities`, so these passes replace the terrain data with empty masks and their own normal.
+
+### Test Notes
+
+- Diagnostic packs on NeoForge 26.x (Windows 11, RTX 3060 Ti, driver 616.56): the arm is drawn by `gbuffers_hand`, its UVs are valid, and it is opaque in `colortex0` when `final.fsh` is skipped. The fixed pack was confirmed in game by the user (opaque arm).
+
 ## 2026-10-29 - Keep Terrain Data Behind Stained Glass and Ice
 
 ### Fixed

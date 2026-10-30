@@ -403,4 +403,22 @@
 
 - [ ] 로더 로그에서 `blend.gbuffers_water.colortex2/3` 4인자 설정이 인식되는지 확인한다.
 - [ ] 색유리 창·얼음 뒤 지형의 그림자·비 효과, 물 위 색유리, 색유리 너머 물을 비교한다.
-- [ ] 후속: `gbuffers_hand_water`도 기본 blending에서 alpha 0 마스크를 써서, 손에 든 반투명 아이템 뒤 지형 데이터를 지우지 못할 수 있다. 게임에서 재현을 확인한 뒤 별도로 다룬다.
+- [x] 후속: `gbuffers_hand_water`도 기본 blending에서 alpha 0 마스크를 써서, 손에 든 반투명 아이템 뒤 지형 데이터를 지우지 못할 수 있다. 게임에서 재현을 확인한 뒤 별도로 다룬다. → 2026-10-30 `blend.gbuffers_hand_water.colortex2/3 = off`로 막았다. 게임 확인은 남아 있다.
+
+## 2026-10-30 - NeoForge 26.x에서 1인칭 팔 반투명
+
+### 현상과 근거
+
+- 보고 환경: Windows 11, RTX 3060 Ti(드라이버 616.56), NeoForge 26.3.0.99, Iris 1.11.7, Sodium 0.9.3-beta.1. 진단 팩 비교는 사용자가 다른 26.x 로더 버전으로 실행했다.
+- 햇빛 아래에서 1인칭 팔에 뒤 바닥의 그림자 경계와 용암 색이 비쳐 반투명해 보였다. 로그에 S-Shader 컴파일 오류는 없었고, 설치된 zip은 저장소 셰이더와 같았다.
+- [x] 손·엔티티 패스를 단색으로 칠한 진단 팩: 팔은 `gbuffers_hand`(빨강), 몹은 `gbuffers_entities`(파랑)가 그린다.
+- [x] 손 패스가 텍스처 좌표를 색으로 출력: 팔이 불투명한 그라데이션으로 보여 UV는 정상이다.
+- [x] `final`을 건너뛰고 `colortex0`을 출력: 팔이 불투명한 스킨으로 보인다. 처음 missing texture로 본 자홍색은 사용자 스킨 색이었다.
+- 결론: 26.x의 1인칭 팔은 반투명 렌더 타입이라 `gbuffers_hand`가 블렌딩을 켠 채 실행된다. alpha 0 마스크가 뒤 지형 마스크를 지우지 못해 `final`이 팔에 지형 그림자·용암·젖은 표면 효과를 적용했다.
+
+### 수정
+
+- [x] `shaders.properties`에서 `gbuffers_hand`, `gbuffers_hand_water`, `gbuffers_entities`의 `colortex2`·`colortex3` blend를 `off`로 설정했다.
+- [x] AGENTS 버퍼 규칙, README, CHANGELOG를 갱신했다.
+- [x] 수정한 팩(`S-Shader-test.zip`)으로 게임에서 팔이 불투명해진 것을 사용자가 확인했다.
+- [ ] 진단용 zip(`S-Shader-debug-hand.zip`, `S-Shader-debug-uv.zip`, `S-Shader-debug-raw.zip`)은 확인 후 테스트 인스턴스의 shaderpacks에서 지운다.
