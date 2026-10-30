@@ -55,6 +55,9 @@ const float VIGNETTE_MIN   = 0.6; // never fully black at the edges
 const float RAIN_FOG_PULL = 0.3; // How much rain pulls the fog start closer (fraction of FOG_START)
 const float FOG_AMBIENT_PULL = 0.55; // Let night fog follow the darkened scene more closely
 const float HORIZON_FOG_PULL = 0.10; // Blends distant terrain into the shared sky horizon curve
+#define AERIAL_FOG_STRENGTH 0.45 // Distance haze that softens terrain beyond the shadow range [0.0 0.15 0.3 0.45 0.6 0.8 1.0]
+const float AERIAL_FOG_START = 0.4; // Haze start, as a fraction of shadowDistance
+const float AERIAL_FOG_RANGE = 2.0; // Haze build-up length, as a multiple of shadowDistance
 
 // ---- Bloom ----
 #define BLOOM_INTENSITY 0.16 // Bloom strength [0.0 0.05 0.1 0.15 0.16 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0]
@@ -192,6 +195,12 @@ void main() {
         float horizonFog = skyHorizonMask(worldDir) * smoothstep(far * 0.35, far, dist);
         float twilightFogSoftening = mix(1.0, 0.58, skyTwilightMask(worldTime));
         fogFactor = clamp(fogFactor + horizonFog * HORIZON_FOG_PULL * twilightFogSoftening * (1.0 + rainStrength * 0.45), 0.0, 1.0);
+        // Block-distance haze, tied to the shadow range so terrain past the last cast shadows loses contrast gradually.
+        if (isEyeInWater == 0) {
+            float hazeDistance = max(dist - shadowDistance * AERIAL_FOG_START, 0.0) / (shadowDistance * AERIAL_FOG_RANGE);
+            float aerialFog = (1.0 - exp(-hazeDistance * 2.0)) * AERIAL_FOG_STRENGTH * (1.0 + rainStrength * 0.35);
+            fogFactor = 1.0 - (1.0 - fogFactor) * (1.0 - clamp(aerialFog, 0.0, 1.0));
+        }
         fogFactor *= mix(0.68, 1.0, skyDayMask(worldTime));
         float shadowFogMask = (1.0 - clamp(shadowVisibility, 0.0, 1.0)) * sceneMask;
         fogFactor *= mix(1.0, 0.72, shadowFogMask);

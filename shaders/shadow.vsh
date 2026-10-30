@@ -20,6 +20,7 @@ const float WET_FOLIAGE_ID = 11103.0;
 const float WET_GLASS_ID = 11104.0;
 const float WET_CROP_ID = 11105.0;
 
+#include "/lib/shadow_settings.glsl"
 #include "/lib/waving.glsl"
 
 float isBlockMaterial(float blockId, float materialId) {
@@ -46,6 +47,8 @@ void main() {
     if (dot(waveOffset, waveOffset) > 0.0) {
         gl_Position = gl_ProjectionMatrix * (shadowModelView * vec4(playerPos + waveOffset, 1.0));
     }
+    // The shadow projection is orthographic (w = 1), so distorting xy here matches final sampling.
+    gl_Position.xy = distortShadowClip(gl_Position.xy);
     texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
     vertexColor = gl_Color;
 

@@ -7,7 +7,8 @@
 #define SHADOW_STRENGTH 1.0 // Cast shadow darkness multiplier [0.0 0.25 0.5 0.75 0.9 1.0 1.1 1.2 1.3]
 
 const float SHADOW_DARKNESS = 0.94;
-const float SHADOW_FADE_START = 0.58;
+const float SHADOW_FADE_START = 0.72; // fraction of shadowDistance where cast shadows start fading
+const float SHADOW_FADE_END = 0.94;
 const float SHADOW_BIAS_TEXELS = 0.6;
 const float SHADOW_SLOPE_BIAS_TEXELS = 2.4;
 const float SHADOW_MAX_SLOPE = 1.5;
@@ -45,11 +46,11 @@ float getShadowLightFade() {
     return elevationFade * lightStrength;
 }
 
-float getShadowBias(vec3 worldNormal, float normalMask) {
+float getShadowBias(vec3 worldNormal, float normalMask, float texelScale) {
     float noL = clamp(abs(dot(worldNormal, getShadowLightDirection())), 0.0, 1.0);
     float slope = sqrt(max(1.0 - noL * noL, 0.0)) / max(noL, 0.2);
     slope = mix(1.0, min(slope, SHADOW_MAX_SLOPE), clamp(normalMask, 0.0, 1.0));
-    float worldTexelSize = 2.0 * SHADOW_TEXEL_SIZE / max(abs(shadowProjection[0].x), 0.00001);
+    float worldTexelSize = 2.0 * SHADOW_TEXEL_SIZE / max(abs(shadowProjection[0].x), 0.00001) * texelScale;
     float depthPerTexel = worldTexelSize * abs(shadowProjection[2].z) * 0.5;
     // Bound the light-space slope bias; screen derivatives jump across geometry edges.
     return depthPerTexel * (SHADOW_BIAS_TEXELS + slope * SHADOW_SLOPE_BIAS_TEXELS);
@@ -163,6 +164,20 @@ float getShadowEdgeFade(vec3 shadowPos) {
     return smoothstep(0.0, SHADOW_EDGE_FADE, edgeDist);
 }
 
+// Circular fade around the player, so the shadow range ends softly instead of as a square.
+float getShadowDistanceFade(vec3 playerPos) {
+    return 1.0 - smoothstep(shadowDistance * SHADOW_FADE_START, shadowDistance * SHADOW_FADE_END, length(playerPos));
+}
+
+// Projects a player-space position into the distorted shadow map; returns the texel scale in w.
+vec4 getShadowSamplePosition(vec3 playerPos) {
+    vec4 shadowClip = shadowProjection * shadowModelView * vec4(playerPos, 1.0);
+    vec3 shadowPos = shadowClip.xyz / shadowClip.w;
+    float texelScale = getShadowDistortionTexelScale(shadowPos.xy);
+    shadowPos.xy = distortShadowClip(shadowPos.xy);
+    return vec4(shadowPos * 0.5 + 0.5, texelScale);
+}
+
 float getShadowVisibility(
     vec3 worldPos,
     float viewDistance,
@@ -175,10 +190,11 @@ float getShadowVisibility(
     if (sceneMask < 0.5) return 1.0;
     float lightFade = getShadowLightFade();
     if (lightFade <= 0.0) return 1.0;
+    float distanceFade = getShadowDistanceFade(worldPos);
+    if (distanceFade <= 0.0) return 1.0;
 
-    vec4 shadowClip = shadowProjection * shadowModelView * vec4(worldPos, 1.0);
-    vec3 shadowPos = shadowClip.xyz / shadowClip.w;
-    shadowPos = shadowPos * 0.5 + 0.5;
+    vec4 shadowSample = getShadowSamplePosition(worldPos);
+    vec3 shadowPos = shadowSample.xyz;
 
     if (shadowPos.x <= 0.0 || shadowPos.x >= 1.0 ||
         shadowPos.y <= 0.0 || shadowPos.y >= 1.0 ||
@@ -186,7 +202,7 @@ float getShadowVisibility(
         return 1.0;
     }
 
-    float bias = getShadowBias(worldNormal, normalMask);
+    float bias = getShadowBias(worldNormal, normalMask, shadowSample.w);
     float visibility = 1.0;
 #if SHADOW_MODE == 1
     visibility = samplePCSSShadow(shadowPos, bias);
@@ -196,7 +212,7 @@ float getShadowVisibility(
 
     float edgeFade = getShadowEdgeFade(shadowPos);
     float weatherFade = 1.0 - clamp(rainStrength, 0.0, 1.0) * 0.55;
-    float shadowStrength = edgeFade * weatherFade * lightFade;
+    float shadowStrength = edgeFade * distanceFade * weatherFade * lightFade;
 
     return mix(1.0, visibility, shadowStrength);
 }
@@ -211,9 +227,8 @@ float getRainExposure(
 ) {
     if (sceneMask < 0.5) return 1.0;
 
-    vec4 shadowClip = shadowProjection * shadowModelView * vec4(worldPos, 1.0);
-    vec3 shadowPos = shadowClip.xyz / shadowClip.w;
-    shadowPos = shadowPos * 0.5 + 0.5;
+    vec4 shadowSample = getShadowSamplePosition(worldPos);
+    vec3 shadowPos = shadowSample.xyz;
 
     if (shadowPos.x <= 0.0 || shadowPos.x >= 1.0 ||
         shadowPos.y <= 0.0 || shadowPos.y >= 1.0 ||
@@ -221,10 +236,10 @@ float getRainExposure(
         return 1.0;
     }
 
-    float bias = getShadowBias(worldNormal, normalMask) * 1.35;
+    float bias = getShadowBias(worldNormal, normalMask, shadowSample.w) * 1.35;
     float visibility = samplePoissonShadow(shadowPos, bias, SHADOW_POISSON_NEAR_RADIUS, 5);
 
-    float distanceFade = 1.0 - smoothstep(farPlane * 0.62, farPlane, viewDistance);
+    float distanceFade = (1.0 - smoothstep(farPlane * 0.62, farPlane, viewDistance)) * getShadowDistanceFade(worldPos);
     float edgeFade = getShadowEdgeFade(shadowPos);
     float exposure = smoothstep(0.18, 0.82, visibility);
 

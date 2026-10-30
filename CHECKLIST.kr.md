@@ -422,3 +422,33 @@
 - [x] AGENTS 버퍼 규칙, README, CHANGELOG를 갱신했다.
 - [x] 수정한 팩(`S-Shader-test.zip`)으로 게임에서 팔이 불투명해진 것을 사용자가 확인했다.
 - [ ] 진단용 zip(`S-Shader-debug-hand.zip`, `S-Shader-debug-uv.zip`, `S-Shader-debug-raw.zip`)은 확인 후 테스트 인스턴스의 shaderpacks에서 지운다.
+
+## 2026-10-30 - 그림자 범위 확장과 대기 연무
+
+### 목표와 성공 기준
+
+- Bliss·Complementary처럼 그림자를 더 멀리 표현하고, 그림자 범위 밖 먼 지형은 연무로 자연스럽게 흐리게 한다.
+- 성공 기준: 기본값(160블록, 2048)에서 가까운 그림자가 기존(96블록)보다 흐려지지 않고, 그림자 끝이 사각형으로 끊기지 않으며, 그림자 범위 밖 지형과의 경계가 눈에 띄지 않는다. FPS 하락은 비교 기록으로 남긴다.
+
+### 구현
+
+- [x] `lib/shadow_settings.glsl`: 그림자 왜곡 함수(`SHADOW_DISTORTION = 0.85`)와 텍셀 크기 배율, `shadowMapResolution` 옵션, `shadowDistanceRenderMul = 1.0`, 기본 `shadowDistance` 160.
+- [x] `shadow.vsh`: 흔들림 적용 뒤 clip xy에 왜곡을 적용한다. 그림자 투영은 직교 투영(w = 1)이라 final의 샘플링 위치와 일치한다.
+- [x] `lib/shadows.glsl`: 샘플링 위치를 같은 함수로 왜곡하고, bias를 위치별 텍셀 크기로 조정한다. 쓰이지 않던 `SHADOW_FADE_START`를 원형 거리 감쇠(72~94%)에 사용하고 비 노출 판정에도 적용한다.
+- [x] `final.fsh`: `AERIAL_FOG_STRENGTH` 대기 연무를 기존 fog 색으로 합성한다. 물속 시점은 제외한다.
+- [x] `shaders.properties`의 screen·sliders, README, CHANGELOG를 갱신했다.
+
+### 검증 기록
+
+| 확인 항목 | 방법 | 결과 | 미실행·실패 이유 |
+|---|---|---|---|
+| 정적 연결 | grep으로 왜곡 함수가 `shadow.vsh`와 `getShadowSamplePosition`에서 같은 함수로 쓰이는지, `getShadowBias` 호출 2곳, screen·sliders 연결 확인 | 통과 | 셰이더 컴파일 아님. 이 PC에 `glslangValidator` 없음 |
+| 형식 | `git diff --check` | 통과(LF/CRLF 안내만) | - |
+| 게임 화면 | 사용자가 `S-Shader-test.zip`으로 확인 | 문제 없음(사용자 보고) | FPS 수치 비교는 기록되지 않음 |
+
+### 남은 확인
+
+- [x] 게임에서 적용 상태를 사용자가 확인했다(2026-10-30).
+- [ ] 가까운 그림자 선명도, 그림자 acne·빛샘, 이동 중 흔들림을 기존(96블록)과 비교한다.
+- [ ] 거리 감쇠 경계와 연무 세기를 낮·노을·비·밤에 확인하고, 필요하면 `SHADOW_DISTORTION`·감쇠 구간·연무 기본값을 조정한다.
+- [ ] `shadowDistance` 160/256, 해상도 2048/4096의 FPS를 비교한다.

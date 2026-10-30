@@ -4,6 +4,23 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-10-30 - Wider Shadows with Distortion, Distance Fade and Aerial Haze
+
+### Added
+
+- Player-centred shadow distortion (`SHADOW_DISTORTION = 0.85`) in `shadow.vsh` and the final sampling, so the shadow map spends its texels near the player. The depth bias scales with the local texel size.
+- `shadowMapResolution` option (1024, 2048, 3072, 4096).
+- Circular distance fade from 72% to 94% of `shadowDistance`, replacing the square cut-off at the map edge. Rain exposure uses the same fade.
+- `AERIAL_FOG_STRENGTH` (default 0.45): block-distance haze that starts at 40% of `shadowDistance` and builds over twice that distance, using the existing sky fog colour. It is not applied while the camera is underwater.
+
+### Changed
+
+- Default `shadowDistance` 96 -> 160, and `shadowDistanceRenderMul = 1.0` so shadow casters render only within that radius.
+
+### Test Notes
+
+- Checked in game by the user with the test pack. Detailed acne/peter-panning, movement, fade ring, haze tuning and FPS comparisons are not recorded yet.
+
 ## 2026-10-30 - Opaque First-Person Arm and Entities
 
 ### Fixed
