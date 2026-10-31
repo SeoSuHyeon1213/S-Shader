@@ -69,9 +69,13 @@ Unity·npm 프로젝트의 설치나 빌드 절차를 가정하지 않는다. �
 | `colortex2.r/g/b/a` | wet floor / wall / lava / water 마스크 |
 | `colortex3.rgb/a` | 0–1 범위로 인코딩된 world normal / 유효 normal 마스크 |
 | `colortex4.rgb` | composite → composite1 용암 halo 가로 blur 중간값. final에서 읽지 않는다. |
+| `colortex5.rgb/a` | 태양 그림자와 분리할 설치·손 광원의 원래 lightmap 색상 / 설치 횃불 발광부 마스크(0–1), 손은 -1. RGBA16F, 매 프레임 0 초기화. composite에서 읽기만 한다. |
 
 - 버퍼 계약 변경 시 작성 패스, composite 전달, final/lib 소비 코드와 `shaders.properties`의 형식을 함께 확인한다.
 - `DRAWBUFFERS:023`에서 `gl_FragData[1]`은 `colortex2`, `gl_FragData[2]`는 `colortex3`에 대응한다. 배열 인덱스를 버퍼 번호로 오해하지 않는다.
+- `DRAWBUFFERS:0235`의 `gl_FragData[3]`은 `colortex5`다. 지형·손·엔티티는 자신의 원래 lightmap 광원색을 쓰고, alpha는 각각 횃불 마스크 / -1 / 0이다. 물·유리는 RGB를 장면과 같은 alpha로 합성하되 alpha 마스크는 뒤쪽 값만 감쇠한다. 구름은 RGB와 마스크 모두 감쇠하며, composite에서 쓰거나 flip하지 않는다.
+- 설치·손 광원은 `lib/local_light.glsl`의 공통 lightmap 경로를 사용한다. final은 원래 블록광을 먼저 빼고 `matchTorchColor`로 색만 보정한 광원을 복원한다. 중복 가산이나 손 전용 색 덧칠 경로를 추가하지 않는다.
+- `colortexNClearColor` 로더 지시문은 `vec4(0.0, 0.0, 0.0, 0.0)`처럼 네 인자를 명시한다. GLSL에서 유효한 단일 인자 생성자라도 현재 Iris 파서에서 로딩 실패를 일으킬 수 있다.
 - `gbuffers_water`의 `colortex2`·`colortex3` alpha는 blend 가중치이자 소유 표시다. 물은 1, 물이 아닌 반투명은 0을 써서 뒤의 불투명 데이터를 보존한다. `shaders.properties`의 blend 설정과 함께 바꾼다.
 - 손·엔티티는 로더 버전에 따라 블렌딩이 켜진 반투명 렌더 타입으로 그려진다(26.x의 1인칭 팔). `gbuffers_hand`·`gbuffers_hand_water`·`gbuffers_entities`의 `colortex2`·`colortex3` blend는 끄고 0 마스크로 덮어써서, 뒤 지형의 그림자·용암·젖은 표면 효과가 손과 엔티티에 적용되지 않게 한다.
 - 손·엔티티 패스의 재질 마스크 초기화를 유지해 terrain/water 효과가 섞이지 않게 한다. normal 변환은 view/world 좌표계를 구분한다.

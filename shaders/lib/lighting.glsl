@@ -3,8 +3,8 @@
 const vec3 SUN_LIGHT_COLOR    = vec3(0.945, 0.996, 0.776); // #F1FEC6 - midday sunlight
 const vec3 SUN_HORIZON_COLOR  = vec3(1.000, 0.557, 0.282); // warm sunrise/sunset glow
 const vec3 MOON_LIGHT_COLOR   = vec3(0.749, 0.847, 1.000); // cool blue moonlight, tuned for night readability
-const vec3 TORCH_LIGHT_COLOR  = vec3(1.000, 0.520, 0.230); // warm installed-torch match
-const vec3 TORCH_EDGE_COLOR   = vec3(1.000, 0.610, 0.300); // warm falloff, less milky than pale yellow
+// Halfway from unmodified block light to the previous orange held-light tint.
+const vec3 TORCH_MID_TINT     = vec3(1.000, 0.760, 0.615);
 const vec3 LAVA_LIGHT_COLOR   = vec3(1.000, 0.227, 0.125); // #FF3A20
 const vec3 LAVA_EDGE_COLOR    = vec3(1.000, 0.478, 0.239); // softer lava spill
 const vec3 UNDERWATER_TINT_COLOR  = vec3(0.58, 0.82, 1.10);
@@ -15,14 +15,14 @@ const vec3 RAIN_AMBIENT_COLOR = vec3(0.340, 0.360, 0.530); // desaturated rainy 
 const float SUN_HORIZON_GLOW = 0.35; // base highlight warmth during sunrise/sunset
 const float NIGHT_READABILITY_LIFT = 0.035; // subtle blue lift on dark areas at night
 
-const float HELD_LIGHT_RANGE_BOOST = 1.25;
-const float HELD_LIGHT_BRIGHTNESS = 0.34;
-const float HELD_LIGHT_AMBIENT = 0.024;
-const float HELD_LIGHT_DAY_OUTDOOR_MIN = 0.28;
-const float HELD_LIGHT_FLICKER_AMOUNT = 0.035;
-
 float getLuminance(vec3 color) {
     return dot(color, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec3 matchTorchColor(vec3 localLight) {
+    vec3 tinted = localLight * TORCH_MID_TINT;
+    // Preserve installed-light luminance while changing only its color balance.
+    return tinted * (getLuminance(localLight) / max(getLuminance(tinted), 0.00001));
 }
 
 float getDayMask(int worldTime) {
@@ -49,59 +49,6 @@ vec3 getSunColor(float dayMask) {
 // Full strength at midday, with an extra glow during the sunrise/sunset transition
 float getSunIntensity(float dayMask, float sunsetGlowStrength) {
     return dayMask * (1.0 + getSunHorizonFactor(dayMask) * SUN_HORIZON_GLOW * sunsetGlowStrength);
-}
-
-float getHeldLightLevel(int heldBlockLightValue, int heldBlockLightValue2) {
-    return max(float(heldBlockLightValue), float(heldBlockLightValue2));
-}
-
-float getHandLightStrength(int heldBlockLightValue, int heldBlockLightValue2) {
-    return clamp(getHeldLightLevel(heldBlockLightValue, heldBlockLightValue2) / 15.0, 0.0, 1.0);
-}
-
-float getHeldLightDistanceFalloff(vec3 viewPos, int heldBlockLightValue, int heldBlockLightValue2) {
-    float lightLevel = getHeldLightLevel(heldBlockLightValue, heldBlockLightValue2);
-    float range = max(lightLevel * HELD_LIGHT_RANGE_BOOST, 1.0);
-    vec3 handLightPos = vec3(0.35, -0.30, -0.20);
-    float lightDistance = length(viewPos - handLightPos);
-    float t = clamp(1.0 - lightDistance / range, 0.0, 1.0);
-    float smoothFalloff = t * t * (3.0 - 2.0 * t);
-
-    vec3 viewDir = normalize(viewPos + vec3(0.0, 0.0, -0.0001));
-    float forwardMask = smoothstep(0.05, 0.85, -viewDir.z);
-    float centerMask = 1.0 - smoothstep(0.12, 1.20, length(viewDir.xy));
-
-    return smoothFalloff * mix(0.72, 1.0, forwardMask * centerMask);
-}
-
-float getHeldLightEnvironmentFactor(vec3 color, float dayMask) {
-    float luma = getLuminance(color);
-    float darkInteriorBoost = mix(1.02, 1.18, 1.0 - smoothstep(0.12, 0.55, luma));
-    float brightDayOutdoorMask = dayMask * smoothstep(0.55, 0.95, luma);
-    return darkInteriorBoost * mix(1.0, HELD_LIGHT_DAY_OUTDOOR_MIN, brightDayOutdoorMask);
-}
-
-float getTorchFlicker(float frameTimeCounter, float handLightStrength) {
-    float slowWave = sin(frameTimeCounter * 9.7);
-    float fastWave = sin(frameTimeCounter * 21.3 + 1.7);
-    float flicker = (slowWave * 0.65 + fastWave * 0.35) * HELD_LIGHT_FLICKER_AMOUNT;
-    return 1.0 + flicker * handLightStrength;
-}
-
-vec3 applyHeldTorchLight(vec3 color, float heldLightMask, float strength, float torchIntensity, float flicker) {
-    float luma = getLuminance(color);
-    float surfaceProtection = 1.0 - smoothstep(0.58, 0.98, luma);
-    float coreMask = heldLightMask * heldLightMask;
-    float edgeMask = heldLightMask * (1.0 - coreMask);
-    vec3 torchTint = mix(TORCH_EDGE_COLOR, TORCH_LIGHT_COLOR, 0.72 + coreMask * 0.28);
-    vec3 warmLift = mix(vec3(1.0), torchTint, 0.58);
-
-    color = mix(color, color * warmLift, edgeMask * strength * torchIntensity * 0.24);
-    color += torchTint * coreMask * strength * torchIntensity * flicker *
-             (HELD_LIGHT_AMBIENT + HELD_LIGHT_BRIGHTNESS * surfaceProtection);
-    color = mix(color, color * vec3(1.035, 0.985, 0.930), heldLightMask * strength * torchIntensity * 0.10);
-
-    return color;
 }
 
 vec3 applyUnderwaterLighting(vec3 color, vec3 worldDir, float viewDistance, float sceneMask) {
@@ -189,16 +136,12 @@ vec3 applyTerrainFormLighting(
 }
 vec3 applyMoodLighting(
     vec3 color,
-    vec3 viewPos,
+    vec3 localLight,
     float sceneMask,
     float strength,
     float rainStrength,
     int worldTime,
-    int heldBlockLightValue,
-    int heldBlockLightValue2,
     float shadowVisibility,
-    float frameTimeCounter,
-    float torchIntensity,
     float dayLightStrength,
     float nightLightStrength,
     float sunsetGlowStrength
@@ -215,12 +158,6 @@ vec3 applyMoodLighting(
     vec3 moonColor = MOON_LIGHT_COLOR * nightLightStrength;
     float sunIntensity = getSunIntensity(dayMask, sunsetGlowStrength) * dayLightStrength;
     float sunGlow = getSunHorizonFactor(dayMask);
-    float handLightStrength = getHandLightStrength(heldBlockLightValue, heldBlockLightValue2);
-    float heldLightBase = handLightStrength
-        * getHeldLightDistanceFalloff(viewPos, heldBlockLightValue, heldBlockLightValue2)
-        * sceneMask;
-    float heldLightMask = clamp(heldLightBase * getHeldLightEnvironmentFactor(color, dayMask), 0.0, 1.0);
-    float torchFlicker = getTorchFlicker(frameTimeCounter, handLightStrength);
     float weatherDampen = 1.0 - rain * 0.35;
 
     vec3 skyTint = mix(moonColor, sunColor, dayMask);
@@ -230,8 +167,8 @@ vec3 applyMoodLighting(
 
     color = mix(color, color * shadowTint, ambientShadowMask * strength * 0.28);
     color = mix(color, color * highlightTint, highlightMask * strength * (0.25 + sunGlow * 0.15 * sunsetGlowStrength) * weatherDampen * (1.0 - castShadowMask * 0.42));
-    float heldTorchStrength = mix(0.82, 1.0, clamp(strength, 0.0, 1.0));
-    color = applyHeldTorchLight(color, heldLightMask, heldTorchStrength, torchIntensity, torchFlicker);
+    // Both installed and held local light are restored after sun/moon shading.
+    color += localLight;
     color += highlightMask * rain * strength * rainReflectTint * 0.06;
     color = mix(color, color * RAIN_AMBIENT_COLOR, rain * strength * 0.07);
     color = mix(color, vec3(getLuminance(color)), rain * strength * 0.10);

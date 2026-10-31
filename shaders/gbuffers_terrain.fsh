@@ -7,18 +7,32 @@ varying vec2 texCoord;
 varying vec2 lmCoord;
 varying vec4 glColor;
 varying float isLava;
+varying float isTorch;
 varying float wetMaskBase;
 varying float wallMaskBase;
 varying vec3 worldNormalOut;
+varying vec3 viewPositionOut;
 
-/* DRAWBUFFERS:023 */
+#include "/lib/local_light.glsl"
+
+/* DRAWBUFFERS:0235 */
 
 void main() {
-    vec4 albedo = texture2D(texture, texCoord) * glColor;
+    vec4 textureSample = texture2D(texture, texCoord);
+    vec4 albedo = textureSample * glColor;
     if (albedo.a < 0.1) discard;
 
-    // Lava is self-lit; preserve its texture even in dark interiors.
-    albedo.rgb *= mix(texture2D(lightmap, lmCoord).rgb, vec3(1.0), clamp(isLava, 0.0, 1.0));
+    // Only the bright torch head emits; the wooden handle keeps normal lighting.
+    vec3 texel = textureSample.rgb;
+    float torchFlame = isTorch * smoothstep(0.55, 0.85, max(texel.r, texel.g));
+    vec2 effectiveLmCoord = getLocalLightmapCoord(lmCoord, viewPositionOut);
+    vec3 lightColor = texture2D(lightmap, effectiveLmCoord).rgb;
+    vec3 blockLight = getLocalBlockLight(effectiveLmCoord);
+    vec3 litColor = albedo.rgb * mix(lightColor, vec3(1.0), max(isLava, torchFlame));
+    // Separate the vanilla block-light component before sunlight shadows are applied.
+    vec3 localLight = min(litColor, albedo.rgb * blockLight);
+    localLight = mix(localLight, litColor, torchFlame) * (1.0 - isLava);
+    albedo.rgb = litColor;
 
     // Keep the scene color buffer opaque. Some Iris/composite paths can treat
     // colortex0 alpha as real transparency, so material masks live in colortex2.
@@ -31,4 +45,5 @@ void main() {
 
     vec3 encodedNormal = normalize(worldNormalOut) * 0.5 + 0.5;
     gl_FragData[2] = vec4(encodedNormal, 1.0);
+    gl_FragData[3] = vec4(localLight, torchFlame);
 }

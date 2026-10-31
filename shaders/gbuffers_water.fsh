@@ -10,7 +10,6 @@ uniform float frameTimeCounter;
 uniform float rainStrength;
 uniform int worldTime;
 uniform mat4 gbufferModelView;
-uniform mat4 gbufferModelViewInverse;
 uniform mat4 gbufferProjectionInverse;
 
 varying vec2 texCoord;
@@ -22,8 +21,9 @@ varying float isWater;
 
 #include "/lib/sky.glsl"
 #include "/lib/water_depth.glsl"
+#include "/lib/local_light.glsl"
 
-/* DRAWBUFFERS:023 */
+/* DRAWBUFFERS:0235 */
 
 const float WATER_FRESNEL_ALPHA_BOOST = 0.06;
 const float WATER_WAVE_NORMAL_STRENGTH = 0.11;
@@ -58,7 +58,8 @@ void main() {
     vec4 albedo = texture2D(texture, texCoord) * glColor;
     if (albedo.a < 0.05) discard;
 
-    vec3 lightColor = texture2D(lightmap, lmCoord).rgb;
+    vec2 effectiveLmCoord = getLocalLightmapCoord(lmCoord, viewDir);
+    vec3 lightColor = texture2D(lightmap, effectiveLmCoord).rgb;
     float ripple = waterRipple(texCoord, frameTimeCounter) * isWater;
     vec3 worldBaseNormal = normalize((gbufferModelViewInverse * vec4(normalize(viewNormal), 0.0)).xyz);
     vec3 worldWaterNormal = getWaterWaveNormal(texCoord, frameTimeCounter, worldBaseNormal);
@@ -99,4 +100,9 @@ void main() {
 
     vec3 encodedNormal = normalize(worldWaterNormal) * 0.5 + 0.5;
     gl_FragData[2] = vec4(encodedNormal, waterOwner);
+    vec3 localLight = albedo.rgb * getLocalBlockLight(effectiveLmCoord);
+    localLight *= mix(vec3(1.0), waterTint, 0.34 * isWater);
+    localLight *= mix(vec3(1.0), vec3(0.68, 0.78, 0.92), verticalWater * 0.28);
+    // Blend local color with the same opacity as the scene; only attenuate the flame marker.
+    gl_FragData[3] = vec4(min(localLight, outColor), outAlpha);
 }

@@ -40,7 +40,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - Lava: `#FF3A20`
 - Rain accent: `#3423A6`
 
-들고 있는 횃불 조명에 실제로 쓰이는 중심 색은 `lib/lighting.glsl`의 `TORCH_LIGHT_COLOR = vec3(1.000, 0.520, 0.230)`이며 근사 색은 `#FF853B`입니다. 기획 색 `#F5853F`와 약간 다르며, 기획 색을 실제 조명에 적용할지는 게임 화면 비교 후 결정합니다.
+설치·손 횃불은 같은 lightmap 조명을 사용합니다. `lib/lighting.glsl`의 `TORCH_MID_TINT = vec3(1.000, 0.760, 0.615)`는 원래 설치광과 이전 주황색 손 조명 사이의 색 보정 배율이며, 고정 출력 RGB 색상이 아닙니다. 보정 후 톤 매핑 이전 명도를 원래 설치광과 맞춥니다.
 
 ## Shader Options
 
@@ -68,7 +68,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `DAY_LIGHT_STRENGTH`
 - `NIGHT_LIGHT_STRENGTH`
 - `SUNSET_GLOW_STRENGTH`
-- `TORCH_LIGHT_INTENSITY`
+- `TORCH_LIGHT_INTENSITY`: 손 광원의 lightmap 레벨 배율. 기본값 `1.0`에서 설치광과 같은 lightmap 응답을 사용하며, `0.0`이면 손 광원만 끕니다. 설치된 횃불의 밝기는 바꾸지 않습니다.
 - `LAVA_EMISSION_INTENSITY`: 용암 자체 발광과 전용 bloom 강도, 기본값 `1.0`
 - `CONTACT_SHADOW_INTENSITY`
 - `RAIN_REFLECTION_INTENSITY`
@@ -91,10 +91,21 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `colortex3.rgb`: encoded world normal
 - `colortex3.a`: valid normal mask
 - `colortex4.rgb`: composite에서 composite1로 넘기는 용암 halo 가로 blur 중간값
+- `colortex5.rgb/a`: 태양 그림자에서 분리할 설치·손 블록광 / 설치 횃불 발광부 마스크. 손은 alpha -1로 구분합니다.
 
-bloom은 `composite`에서 가로, `composite1`에서 세로로 나눠 blur합니다. 결과는 기존 5×5 bloom·3×3 용암 halo와 같고, bloom 관련 텍스처 읽기는 픽셀당 68회에서 24회로 줄었습니다.
+bloom은 `composite`에서 가로, `composite1`에서 세로로 나눠 blur합니다. 5×5 bloom·3×3 용암 halo를 유지하며, 횃불 마스크를 포함한 bloom 관련 텍스처 읽기는 픽셀당 29회입니다.
 
-버퍼 형식(`colortex0` RGBA8, `colortex1` RGBA16F, `colortex2` RGBA8, `colortex3` RGBA16F, `colortex4` RGBA16F)은 `composite.fsh`의 블록 주석 안에 로더 지시문으로 선언합니다. `shaders.properties`의 `colortexNFormat` 키는 로더가 읽지 않으므로 사용하지 않습니다.
+버퍼 형식(`colortex0` RGBA8, `colortex1` RGBA16F, `colortex2` RGBA8, `colortex3` RGBA16F, `colortex4` RGBA16F, `colortex5` RGBA16F)은 `composite.fsh`의 블록 주석 안에 로더 지시문으로 선언합니다. `shaders.properties`의 `colortexNFormat` 키는 로더가 읽지 않으므로 사용하지 않습니다.
+
+### 횃불 조명
+
+지형 lightmap의 블록광 성분을 따로 보존해 태양·달 그림자와 form/mood 조명 때문에 횃불 주변이 과도하게 어두워지지 않도록 합니다. 바닐라의 밝기 분포와 거리 감쇠를 기준으로 하며, 최종 색 보정·안개·비 효과 때문에 바닐라 화면과 완전히 같은 밝기를 보장하지는 않습니다. lightmap은 광원 종류를 구분하지 않아 다른 발광 블록의 주변 조명에도 적용됩니다. 별도의 횃불 그림자나 광선 추적은 추가하지 않습니다.
+
+설치된 일반 횃불·벽 횃불의 밝은 머리 부분에는 낮은 강도의 bloom을 적용합니다. 태양의 bloom 임계값은 그대로 유지하며, 나무 손잡이와 손에 든 아이템은 이 발광 마스크에 포함하지 않습니다. `BLOOM_INTENSITY = 0.0`이면 번짐만 꺼지고 주변 조명은 유지됩니다.
+
+손 광원은 화면 위 주황색 가산 대신 `lib/local_light.glsl`에서 설치광과 동일한 lightmap을 읽어 텍스처를 밝힙니다. 광원 레벨에서 월드 축 방향의 거리 합을 빼 감쇠하며, 설치광과 손 광원 중 높은 레벨을 사용해 중첩 과노출을 막습니다. 양손도 더 밝은 광원 하나의 레벨을 사용합니다. 이전 손 패스의 0.80배 감광과 별도 주황색 가산·깜박임은 제거했습니다. 손·엔티티·반투명 표면도 같은 조명을 사용하며 손 모델의 bloom 추출 제외는 유지합니다.
+
+두 조명에 같은 중간색 보정을 적용하고 보정 전 명도를 유지합니다. 동일 재질·동일 광원 레벨에서 같은 응답을 목표로 하며, 위치가 다른 광원으로 비춘 두 스크린샷의 모든 픽셀을 같게 만들지는 않습니다. 손 광원은 카메라 위치의 근사 광원이며 설치광처럼 블록 경로·벽 차폐를 추적하지 않습니다. lightmap이 광원 종류를 구분하지 않아 다른 발광 블록도 같은 색 보정을 받습니다. 발광부 텍스처는 색 보정에서 제외합니다. 최종 톤 매핑·안개 때문에 표시 명도는 다소 달라질 수 있습니다. 추가 버퍼와 각 수광 패스의 lightmap 샘플 2회, bloom 마스크 샘플 5회, final 샘플 1회의 FPS 영향은 게임에서 확인해야 합니다.
 
 ## Sky / Fog Layout
 
@@ -215,6 +226,7 @@ NeOculus/Embeddium 환경에서 특정 후처리 조합이 GPU/드라이버 쪽 
 
 ## 검증 상태
 
+- 2026-10-31 횃불 변경은 Windows, GTX 1650 Max-Q, NVIDIA 617.42의 OpenGL 4.6 컨텍스트에서 기본·PCSS/SSR/contact shadow·효과 비활성 세 조합, 총 36개 프로그램의 컴파일·링크를 통과했습니다. 이전 Iris 오류를 일으킨 clear-color 지시문의 네 인자 형식과 버퍼 연결도 정적으로 검사했습니다. 실제 Iris 재로드, 바닐라 밝기 비교와 FPS 측정은 미실행입니다.
 - 최근 그림자·물 수심·용암 발광·버퍼 형식 변경은 정적 검사(include 경로, 패스 인터페이스, 옵션 연결)만 마쳤습니다. 게임 컴파일, 화면 비교와 FPS 측정은 아직 하지 않았습니다.
 - 안정성 향상과 색 층 분리 완화는 품질 목표이며, 아직 게임에서 비교 검증하지 않았습니다.
 - 호환성은 실제로 확인한 Minecraft·로더·GPU/드라이버 조합에 대해서만 이 절에 기록합니다. 현재 기록된 확인 조합은 없습니다.

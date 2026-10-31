@@ -6,6 +6,7 @@ uniform sampler2D colortex0; // composited scene color
 uniform sampler2D colortex1; // blurred bloom buffer (from composite)
 uniform sampler2D colortex2; // terrain wet/wall/lava/water masks
 uniform sampler2D colortex3; // encoded world normals
+uniform sampler2D colortex5; // preserved local block light / flame / hand marker
 uniform sampler2D depthtex0; // scene depth
 uniform sampler2D depthtex1; // opaque bottom behind translucent water
 uniform sampler2D shadowtex0; // sun/moon shadow map
@@ -16,8 +17,6 @@ uniform float rainStrength;
 uniform float frameTimeCounter;
 uniform float sunAngle;
 uniform int worldTime;
-uniform int heldBlockLightValue;
-uniform int heldBlockLightValue2;
 uniform int isEyeInWater;
 uniform mat4 gbufferProjection;
 uniform mat4 gbufferProjectionInverse;
@@ -68,7 +67,6 @@ const float AERIAL_FOG_RANGE = 2.0; // Haze build-up length, as a multiple of sh
 
 // ---- Lighting ----
 #define LIGHTING_STRENGTH 0.5 // Mood lighting strength [0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0]
-#define TORCH_LIGHT_INTENSITY 1.0 // Held torch intensity [0.0 0.25 0.5 0.65 0.75 0.85 1.0 1.15 1.3 1.5]
 #define DAY_LIGHT_STRENGTH 1.0 // Daylight strength [0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3 1.4]
 #define NIGHT_LIGHT_STRENGTH 1.0 // Moonlight/night readability strength [0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.3]
 #define SUNSET_GLOW_STRENGTH 1.0 // Sunrise/sunset warm glow strength [0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
@@ -103,6 +101,11 @@ void main() {
     vec3 color = sceneSample.rgb;
     vec4 terrainSurfaceMasks = texture2D(colortex2, texCoord);
     vec4 normalSample = texture2D(colortex3, texCoord);
+    vec4 localLightSample = texture2D(colortex5, texCoord);
+    vec3 localLight = min(color, max(localLightSample.rgb, vec3(0.0)));
+    color -= localLight;
+    // Keep the torch texture's emissive head unchanged; tint only reflected local light.
+    localLight = mix(matchTorchColor(localLight), localLight, clamp(localLightSample.a, 0.0, 1.0));
     float terrainWetMask = terrainSurfaceMasks.r;
     float terrainWallMask = terrainSurfaceMasks.g;
     float lavaMask = terrainSurfaceMasks.b; // written by gbuffers_terrain via block.properties
@@ -157,7 +160,7 @@ void main() {
 #endif
 
     // Mood lighting
-    color = applyMoodLighting(color, viewPos, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, heldBlockLightValue, heldBlockLightValue2, shadowVisibility, frameTimeCounter, TORCH_LIGHT_INTENSITY, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
+    color = applyMoodLighting(color, localLight, sceneMask, LIGHTING_STRENGTH, rainStrength, worldTime, shadowVisibility, DAY_LIGHT_STRENGTH, NIGHT_LIGHT_STRENGTH, SUNSET_GLOW_STRENGTH);
 
     // Darken rain-exposed textures before adding wet highlights and reflections.
     color = applyRainTextureDarkening(color, depth, sceneMask, terrainWetMask, terrainWallMask, surfaceRainStrength);

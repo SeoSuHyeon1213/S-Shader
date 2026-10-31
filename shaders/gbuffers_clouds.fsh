@@ -11,7 +11,7 @@ varying vec3 viewDir;
 
 #include "/lib/sky.glsl"
 
-/* DRAWBUFFERS:0 */
+/* DRAWBUFFERS:05 */
 
 
 float sampleCloudAlpha(vec2 uv) {
@@ -49,4 +49,5 @@ void main() {
     vec3 skyMatchedCloud = getSkyCloudColor(worldDir, cloudSample.rgb, thickness, selfShadow, edgeLight, worldTime, rainStrength);
 
     gl_FragData[0] = vec4(skyMatchedCloud, cloudSample.a);
+    gl_FragData[1] = vec4(0.0, 0.0, 0.0, cloudSample.a);
 }

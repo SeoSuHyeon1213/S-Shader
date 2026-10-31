@@ -13,9 +13,11 @@ varying vec2 texCoord;
 varying vec2 lmCoord;
 varying vec4 glColor;
 varying float isLava;
+varying float isTorch;
 varying float wetMaskBase;
 varying float wallMaskBase;
 varying vec3 worldNormalOut;
+varying vec3 viewPositionOut;
 
 const float LAVA_BLOCK_ID = 11000.0;
 const float WET_STONE_ID = 11100.0;
@@ -71,9 +73,11 @@ void main() {
         gl_Position = gl_ProjectionMatrix * (gbufferModelView * vec4(playerPos + waveOffset, 1.0));
     }
     texCoord = (gl_TextureMatrix[0] * gl_MultiTexCoord0).xy;
+    viewPositionOut = (gbufferModelView * vec4(playerPos + waveOffset, 1.0)).xyz;
     lmCoord = (gl_TextureMatrix[1] * gl_MultiTexCoord1).xy;
     glColor = gl_Color;
     isLava = float(abs(mc_Entity.x - LAVA_BLOCK_ID) < 0.5);
+    isTorch = float(abs(mc_Entity.x - 11002.0) < 0.5);
 
     vec3 viewNormal = normalize(gl_NormalMatrix * gl_Normal);
     vec3 worldNormal = normalize((gbufferModelViewInverse * vec4(viewNormal, 0.0)).xyz);

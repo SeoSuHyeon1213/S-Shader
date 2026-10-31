@@ -5,6 +5,7 @@ varying vec2 texCoord;
 uniform sampler2D colortex0; // scene color
 uniform sampler2D colortex2; // terrain material masks
 uniform sampler2D colortex3; // encoded world normals
+uniform sampler2D colortex5; // local block light / torch flame / hand marker
 uniform float viewWidth;
 uniform float viewHeight;
 
@@ -22,6 +23,9 @@ const int colortex1Format = RGBA16F;
 const int colortex2Format = RGBA8;
 const int colortex3Format = RGBA16F;
 const int colortex4Format = RGBA16F;
+const int colortex5Format = RGBA16F;
+const bool colortex5Clear = true;
+const vec4 colortex5ClearColor = vec4(0.0, 0.0, 0.0, 0.0);
 */
 
 #define BLOOM_THRESHOLD 0.8 // Bloom threshold [0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.1 1.2 1.4 1.6]
@@ -34,6 +38,11 @@ vec3 brightPass(vec2 uv) {
     float brightness = dot(color, vec3(0.2126, 0.7152, 0.0722));
     float contribution = smoothstep(BLOOM_THRESHOLD, BLOOM_THRESHOLD + BLOOM_KNEE, brightness);
     vec3 sceneBloom = color * contribution;
+    float localMask = texture2D(colortex5, uv).a;
+    float torchFlame = clamp(localMask, 0.0, 1.0);
+    vec3 torchBloom = color * 0.45;
+    sceneBloom = mix(sceneBloom, torchBloom, torchFlame);
+    sceneBloom *= step(-0.5, localMask); // Held items do not feed the bright pass.
     vec3 lavaBloom = mix(color, LAVA_BLOOM_COLOR, 0.58) * lavaMask * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY;
     return max(sceneBloom, lavaBloom);
 }
