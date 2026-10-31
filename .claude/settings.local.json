@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -c safe.directory=D:/Game/S-Shader diff --check)",
+      "Bash(echo \"check=$?\")",
+      "Bash(git -c safe.directory=D:/Game/S-Shader status --short)",
+      "Bash(python -I \"C:/Users/USER/AppData/Local/Temp/claude/D--Game-S-Shader/1780cb93-1a75-4b75-9af3-6562c11fac77/scratchpad/wave_check.py\")",
+      "Bash(git -c safe.directory=D:/Game/S-Shader log --oneline -3)",
+      "Bash(sed -i 's|sa = \\(t / 24000.0 + 0.25\\) % 1.0|sa = \\(t / 24000.0\\) % 1.0|; s|sunAngle = fract\\(t/24000 - 0.25\\) approx|sunAngle ~ t/24000 \\(0 sunrise, 0.25 noon, 0.5 sunset\\)|' C:/Users/USER/AppData/Local/Temp/claude/D--Game-S-Shader/1780cb93-1a75-4b75-9af3-6562c11fac77/scratchpad/bloom_check.py)",
+      "Bash(python -I C:/Users/USER/AppData/Local/Temp/claude/D--Game-S-Shader/1780cb93-1a75-4b75-9af3-6562c11fac77/scratchpad/bloom_check.py)",
+      "Bash(git -c safe.directory=D:/Game/S-Shader diff --stat)",
+      "Bash(python -I -c ' *)"
+    ]
+  }
+}
