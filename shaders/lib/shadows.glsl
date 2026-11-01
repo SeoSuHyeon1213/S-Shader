@@ -4,7 +4,7 @@
 
 #define SHADOW_MODE 0 // Shadow filter mode: 0 = stable Poisson PCF, 1 = experimental PCSS [0 1]
 
-#define SHADOW_STRENGTH 1.0 // Cast shadow darkness multiplier [0.0 0.25 0.5 0.75 0.9 1.0 1.1 1.2 1.3]
+#define SHADOW_STRENGTH 1.0 // Cast shadow darkness multiplier [0.0 0.25 0.5 0.75 0.9 1.0 1.1 1.2 1.3 1.5 1.75 2.0 2.5 3.0]
 
 const float SHADOW_DARKNESS = 0.94;
 const float SHADOW_FADE_START = 0.72; // fraction of shadowDistance where cast shadows start fading

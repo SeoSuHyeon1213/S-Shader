@@ -1,6 +1,6 @@
 // Loader directives and shadow-space distortion shared by shadow rendering and final sampling.
-const int shadowMapResolution = 2048; // Shadow map resolution [1024 2048 3072 4096]
-const float shadowDistance = 160.0; // Shadow projection radius in blocks [32.0 48.0 64.0 96.0 128.0 160.0 192.0 256.0]
+const int shadowMapResolution = 2048; // Shadow map resolution [1024 2048 3072 4096 6144 8192]
+const float shadowDistance = 160.0; // Shadow projection radius in blocks [32.0 48.0 64.0 96.0 128.0 160.0 192.0 256.0 320.0 384.0 512.0]
 const float shadowDistanceRenderMul = 1.0; // Render shadow casters only within shadowDistance
 const float shadowIntervalSize = 8.0;
 const bool shadowtex0Nearest = true;

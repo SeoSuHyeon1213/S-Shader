@@ -13,6 +13,8 @@ uniform sampler2D shadowtex0; // sun/moon shadow map
 
 uniform float near;
 uniform float far;
+uniform float viewWidth;
+uniform float viewHeight;
 uniform float rainStrength;
 uniform float frameTimeCounter;
 uniform float sunAngle;
@@ -34,11 +36,13 @@ uniform mat4 shadowProjection;
 #include "/lib/water_depth.glsl"
 #include "/lib/wet.glsl"
 #include "/lib/ssr.glsl"
+#include "/lib/sharpen.glsl"
 
 // ---- Color Grading ----
 #define EXPOSURE -0.25 // Exposure (EV stops) [-2.0 -1.75 -1.5 -1.25 -1.0 -0.75 -0.5 -0.25 0.0 0.25 0.5 0.75 1.0 1.25 1.5 1.75 2.0]
 #define CONTRAST 1.05 // Contrast [0.75 0.8 0.85 0.88 0.9 0.95 1.0 1.05 1.1 1.15 1.2 1.25 1.3 1.4]
 #define SATURATION 1.0 // Saturation [0.5 0.6 0.7 0.72 0.8 0.9 0.936 1.0 1.1 1.2 1.3 1.4 1.5]
+#define SHARPNESS 0.0 // Scene texture sharpening [0.0 0.1 0.2 0.3 0.4 0.5 0.65 0.8 1.0 1.25 1.5 1.75 2.0]
 const vec3  COLOR_TINT = vec3(1.03, 1.015, 0.99); // soft pastel warmth
 // Scene level that tonemaps to full white; above 1.0 so bloom and emission keep some highlight roll-off.
 const float TONEMAP_WHITE_INPUT = 1.25;
@@ -59,7 +63,7 @@ const float AERIAL_FOG_START = 0.4; // Haze start, as a fraction of shadowDistan
 const float AERIAL_FOG_RANGE = 2.0; // Haze build-up length, as a multiple of shadowDistance
 
 // ---- Bloom ----
-#define BLOOM_INTENSITY 0.16 // Bloom strength [0.0 0.05 0.1 0.15 0.16 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0]
+#define BLOOM_INTENSITY 0.16 // Bloom strength [0.0 0.05 0.1 0.15 0.16 0.2 0.25 0.3 0.35 0.4 0.45 0.5 0.6 0.7 0.8 0.9 1.0 1.25 1.5 1.75 2.0 2.5 3.0]
 #define LAVA_EMISSION_INTENSITY 1.0 // Lava emission strength [0.0 0.5 0.75 1.0 1.25 1.5 2.0]
 
 // ---- Contact Shadows ----
@@ -98,6 +102,7 @@ vec3 getWorldDirection(vec3 viewPos) {
 }
 void main() {
     vec4 sceneSample = texture2D(colortex0, texCoord);
+    sceneSample.rgb = sharpenScene(colortex0, texCoord, sceneSample.rgb, vec2(viewWidth, viewHeight), SHARPNESS);
     vec3 color = sceneSample.rgb;
     vec4 terrainSurfaceMasks = texture2D(colortex2, texCoord);
     vec4 normalSample = texture2D(colortex3, texCoord);

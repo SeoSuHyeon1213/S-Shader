@@ -47,8 +47,8 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 옵션은 Iris/NeOculus 셰이더 옵션 화면에 직접 노출됩니다.
 
 - `SHADOW_MODE`: `0` = 고정 반경 Poisson PCF (기본값), `1` = 실험적 PCSS
-- `shadowDistance`: 그림자 투영 범위의 반경(블록). 슬라이더 선택값은 `32`, `48`, `64`, `96`, `128`, `160`, `192`, `256`이며 기본값은 `160`입니다. 그림자 caster도 이 반경 안에서만 렌더링합니다.
-- `shadowMapResolution`: 그림자 맵 해상도. `1024`, `2048`(기본값), `3072`, `4096`. 높을수록 선명하지만 그래픽 메모리와 그림자 패스 비용이 늘어납니다.
+- `shadowDistance`: 그림자 투영 반경(블록). `32`, `48`, `64`, `96`, `128`, `160`(기본값), `192`, `256`, `320`, `384`, `512`. caster도 이 반경 안에서 렌더링하며 실제 범위는 게임 렌더 거리의 영향을 받습니다. 같은 해상도에서 거리를 늘리면 먼 그림자가 더 거칠어질 수 있습니다.
+- `shadowMapResolution`: 그림자 맵 해상도. `1024`, `2048`(기본값), `3072`, `4096`, `6144`, `8192`. 높은 값은 실험용이며 GPU 지원과 VRAM 여유가 필요합니다. 8192의 픽셀 수는 2048의 16배이므로 메모리·렌더링 비용이 크게 증가할 수 있습니다. 문제가 생기면 2048/4096으로 되돌립니다.
 - `WATER_REFLECTION_MODE`: `0` = 안정적인 sky/Fresnel 물 반사와 mirrored screen fallback (기본값), `1` = 안정 반사를 끄고 SSR 반사로 대체. SSR이 반사 대상을 찾지 못하거나 반사 방향이 화면 밖을 향하면 하늘 반사색을 사용합니다. 두 모드 모두 수평 수면에만 반사를 적용합니다.
 - `ENABLE_CONTACT_SHADOWS`: 가까운 거리 screen-space contact shadow on/off
 - `ENABLE_NORMAL_FORM_LIGHTING`: normal buffer 기반 지형 입체 조명 on/off
@@ -56,12 +56,13 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `ENABLE_WET_SCREEN_REFLECTIONS`: 젖은 바닥 screen-space reflection on/off
 - `ENABLE_WET_SPECULAR`: normal buffer와 material response 기반 젖은 표면 BRDF 하이라이트 on/off
 - `ENABLE_WATER_SURFACE`: 물 Fresnel/flow surface shading on/off
-- `SHADOW_STRENGTH`: 그림자 진하기 배율, 기본값 `1.0`. `0.0`은 그림자 어둡게 하기를 끄고, `1.0`보다 크면 그림자 계수에 거듭제곱을 적용해 더 어둡게 합니다.
+- `SHADOW_STRENGTH`: 그림자 진하기 배율, `0.0`~`3.0`, 기본값 `1.0`. `0.0`은 그림자 어둡게 하기를 끄고, `1.0`보다 크면 더 어둡게 합니다. 그림자의 범위·선명도를 늘리는 옵션과는 별개이며 높은 값에서는 암부 디테일이 사라질 수 있습니다.
 - `WAVING_PLANTS`: 나뭇잎·풀·꽃·작물 바람 흔들림 on/off, 기본값 `1`
 - `WAVING_STRENGTH`: 흔들림 크기 배율, 기본값 `1.0`. 기본값에서 비가 올 때 최대 이동은 나뭇잎 약 0.09블록, 한 칸 식물 끝 약 0.18블록, 두 칸 식물 끝 약 0.36블록입니다.
 - `EXPOSURE`: 기본값 `-0.25`
 - `CONTRAST`: 기본값 `1.05`
 - `SATURATION`: 기본값 `1.0`
+- `SHARPNESS`: 장면 텍스처 선명도, `0.0`~`2.0`, 기본값 `0.0`(기존 화면 유지). 조명·색 보정 이전 장면에 4방향 unsharp mask를 적용하며 HUD는 대상이 아닙니다. 활성화하면 픽셀당 장면 읽기 4회가 추가됩니다. 큰 값은 텍스처 노이즈·윤곽선·이동 중 반짝임을 강조할 수 있습니다.
 
 색 보정 결과는 ACES 톤 매핑으로 압축됩니다. 장면 값은 HDR이 아닌 0~1 표시 색이라, ACES만 쓰면 흰색이 약 0.81에서 멈춥니다. 그래서 장면 값 `1.25`가 흰색 1.0이 되도록 정규화합니다. 이 흰색 기준도 `EXPOSURE`·`CONTRAST`로 같이 보정되므로, 옵션을 바꿔도 흰색이 다시 회색으로 눌리지 않습니다. 기존 옵션 파일에 `EXPOSURE`·`CONTRAST`·`SATURATION`이 저장되어 있으면 새 기본값이 적용되지 않으므로, 옵션 화면에서 기본값으로 되돌린 뒤 비교합니다.
 - `LIGHTING_STRENGTH`
@@ -73,7 +74,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `CONTACT_SHADOW_INTENSITY`
 - `RAIN_REFLECTION_INTENSITY`
 - `WATER_REFLECTION_INTENSITY`: 물 반사 강도의 기준값, 기본값 `0.6`. 수심에 따라 배율이 적용되며 최종 반사율은 Fresnel과 수면 방향의 감쇠를 거칩니다. [Shallow / Deep Water](#shallow--deep-water) 참고
-- `BLOOM_INTENSITY`
+- `BLOOM_INTENSITY`: 빛 번짐 강도, `0.0`~`3.0`, 기본값 `0.16` 유지. 큰 값은 태양·횃불·용암 번짐과 하이라이트 과노출을 강화합니다. 번짐 반경이 아니라 합성 강도입니다.
 - `BLOOM_THRESHOLD`
 - `FOG_DENSITY`
 - `FOG_START`
@@ -125,8 +126,8 @@ bloom은 `composite`에서 가로, `composite1`에서 세로로 나눠 blur합�
 - `shadowtex0`, `shadowModelView`, `shadowProjection` 기반 shadow map sampling
 - `SHADOW_MODE = 0`: 중심 1곳과 고정 Poisson 8곳, 총 9개 필터 위치의 PCF
 - `SHADOW_MODE = 1`: 8-sample blocker search 후 같은 9개 위치로 필터링하는 PCSS. blocker를 찾지 못하면 PCF로 대체
-- `shadowMapResolution = 2048` 기본값, 1024~4096 선택 가능
-- `shadowDistance = 160.0` 기본값, 게임 내 셰이더 옵션에서 32~256블록으로 조절 가능
+- `shadowMapResolution = 2048` 기본값, 1024~8192 선택 가능(6144/8192는 고비용 실험용)
+- `shadowDistance = 160.0` 기본값, 게임 내 셰이더 옵션에서 32~512블록으로 조절 가능
 - `shadowDistanceRenderMul = 1.0`으로 그림자 caster를 `shadowDistance` 안에서만 렌더링
 - `shadowIntervalSize = 8.0`
 - 위 설정과 그림자 왜곡 함수는 `lib/shadow_settings.glsl`에 선언하고 shadow/final 패스에서 공유
