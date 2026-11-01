@@ -57,6 +57,7 @@ S-Shader는 Iris/NeOculus 환경을 목표로 제작 중인 Minecraft 셰이더�
 - `ENABLE_WET_SPECULAR`: normal buffer와 material response 기반 젖은 표면 BRDF 하이라이트 on/off
 - `ENABLE_WATER_SURFACE`: 물 Fresnel/flow surface shading on/off
 - `SHADOW_STRENGTH`: 그림자 진하기 배율, `0.0`~`3.0`, 기본값 `1.0`. `0.0`은 그림자 어둡게 하기를 끄고, `1.0`보다 크면 더 어둡게 합니다. 그림자의 범위·선명도를 늘리는 옵션과는 별개이며 높은 값에서는 암부 디테일이 사라질 수 있습니다.
+- `PLANT_SHADOW_OPACITY`: 풀·꽃·두 칸 식물이 드리우는 그림자 농도, `0.58`~`1.0`, 기본값 `1.0`. 1보다 작으면 dither로 그림자를 성기게 해 빽빽한 풀밭의 그림자를 옅게 합니다.
 - `WAVING_PLANTS`: 나뭇잎·풀·꽃·작물 바람 흔들림 on/off, 기본값 `1`
 - `WAVING_STRENGTH`: 흔들림 크기 배율, 기본값 `1.0`. 기본값에서 비가 올 때 최대 이동은 나뭇잎 약 0.09블록, 한 칸 식물 끝 약 0.18블록, 두 칸 식물 끝 약 0.36블록입니다.
 - `EXPOSURE`: 기본값 `-0.25`
@@ -141,7 +142,8 @@ bloom은 `composite`에서 가로, `composite1`에서 세로로 나눠 blur합�
 - screen-space contact shadow
 - normal buffer 기반 terrain form lighting
 - shadow pass의 기본 alpha cutout 및 water/lava caster 제외
-- foliage/crop/glass material의 dithered partial caster rule
+- foliage/crop/glass material의 dithered partial caster rule. 풀·꽃·두 칸 식물은 `PLANT_SHADOW_OPACITY`(기본 1.0, 텍스처 모양 그대로)를 사용
+- 물 밖에서 얕은 물을 볼 때 바닥(수초·다시마·물가 지형)의 그림자를 수심에 따라 섞음. 2블록 이하는 바닥 그림자를 그대로, 12블록 이상은 수면 그림자만 사용
 - material mask 기반 wet/water/lava shadow tint 및 강도 보정
 - 플레이어 거리에 따라 바뀌던 PCF/PCSS 필터 반경과 그림자 농도 보정을 제거해 이동에 따른 필터·농도 변화 완화
 - `ENABLE_CONTACT_SHADOWS = 0` 기본값으로 screen-space 그림자 이동감 최소화

@@ -151,6 +151,12 @@ void main() {
     float terrainReceiverMask = step(0.001, max(max(terrainWetMask, terrainWallMask), max(lavaMask, waterMask)));
     float terrainSceneMask = sceneMask * terrainReceiverMask;
     float shadowVisibility = getShadowVisibility(receiverWorldPos, dist, far, terrainSceneMask, worldNormal, normalMask, rainStrength);
+    // Shallow water seen from above shows its floor, so blend in the floor's cast shadows (seagrass, kelp, banks) by water clarity.
+    if (waterMask > 0.001 && isEyeInWater == 0 && verticalWaterMask < 0.5 && opaqueDepth < 1.0 && waterDepthFactor < 1.0) {
+        vec3 floorWorldPos = getWorldPosition(getViewPosition(texCoord, opaqueDepth));
+        float floorVisibility = getShadowVisibility(floorWorldPos, dist, far, terrainSceneMask, worldNormal, normalMask, rainStrength);
+        shadowVisibility = mix(shadowVisibility, floorVisibility, 1.0 - waterDepthFactor);
+    }
     float rainExposure = 1.0;
     if (rainStrength > 0.001) {
         rainExposure = getRainExposure(receiverWorldPos, dist, far, terrainSceneMask, worldNormal, normalMask);

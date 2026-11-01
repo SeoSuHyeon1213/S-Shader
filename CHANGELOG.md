@@ -4,6 +4,20 @@ All notable changes to this shader pack will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## 2026-11-01 - Stronger Plant Shadows and Shallow-Water Floor Shadows
+
+### Changed
+
+- Grass, flowers and tall plants now cast shadows at full opacity by default instead of a 0.58 dither, so their silhouettes follow the texture cut-out. `PLANT_SHADOW_OPACITY` (0.58-1.0) restores a lighter, dithered look.
+
+### Added
+
+- Water seen from above blends the shadow on its floor by water clarity: the full floor shadow up to 2 blocks deep, fading to the surface shadow at 12 blocks. Seagrass, kelp and bank shadows now show through shallow water. Water pixels inside the shadow range take one extra shadow lookup.
+
+### Test Notes
+
+- Checked in game by the user with the test pack. Per-scene results (dense grass, shallow/deep water, waterfalls) and FPS are not recorded.
+
 ## 2026-10-30 - Wider Shadows with Distortion, Distance Fade and Aerial Haze
 
 ### Added

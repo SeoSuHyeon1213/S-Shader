@@ -20,6 +20,8 @@ const float WET_FOLIAGE_ID = 11103.0;
 const float WET_GLASS_ID = 11104.0;
 const float WET_CROP_ID = 11105.0;
 
+#define PLANT_SHADOW_OPACITY 1.0 // Cast shadow opacity of grass, flowers and tall plants [0.58 0.7 0.8 0.9 1.0]
+
 #include "/lib/shadow_settings.glsl"
 #include "/lib/waving.glsl"
 
@@ -31,8 +33,8 @@ float getShadowCasterOpacity(float blockId) {
     float opacity = 1.0;
     opacity = mix(opacity, 0.58, isBlockMaterial(blockId, WET_FOLIAGE_ID));
     opacity = mix(opacity, 0.58, isBlockMaterial(blockId, WAVING_LEAVES_ID));
-    opacity = mix(opacity, 0.58, isBlockMaterial(blockId, WAVING_PLANT_ID));
-    opacity = mix(opacity, 0.58, isBlockMaterial(blockId, WAVING_TALL_UPPER_ID));
+    opacity = mix(opacity, PLANT_SHADOW_OPACITY, isBlockMaterial(blockId, WAVING_PLANT_ID));
+    opacity = mix(opacity, PLANT_SHADOW_OPACITY, isBlockMaterial(blockId, WAVING_TALL_UPPER_ID));
     opacity = mix(opacity, 0.30, isBlockMaterial(blockId, WET_GLASS_ID));
     opacity = mix(opacity, 0.44, isBlockMaterial(blockId, WET_CROP_ID));
     return opacity;
