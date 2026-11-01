@@ -10,11 +10,13 @@ varying vec3 worldNormalOut;
 varying vec3 viewPositionOut;
 
 #include "/lib/local_light.glsl"
+#include "/lib/held_bloom.glsl"
 
 /* DRAWBUFFERS:0235 */
 
 void main() {
-    vec4 albedo = texture2D(texture, texCoord) * glColor;
+    vec4 textureSample = texture2D(texture, texCoord);
+    vec4 albedo = textureSample * glColor;
     if (albedo.a < 0.10) discard;
 
     vec2 effectiveLmCoord = getLocalLightmapCoord(lmCoord, viewPositionOut);
@@ -30,5 +32,5 @@ void main() {
 
     vec3 encodedNormal = normalize(worldNormalOut) * 0.5 + 0.5;
     gl_FragData[2] = vec4(encodedNormal, 1.0);
-    gl_FragData[3] = vec4(localLight, -1.0);
+    gl_FragData[3] = vec4(localLight, -1.0 - getHeldBloomMask(textureSample.rgb));
 }

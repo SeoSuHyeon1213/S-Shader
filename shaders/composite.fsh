@@ -42,7 +42,9 @@ vec3 brightPass(vec2 uv) {
     float torchFlame = clamp(localMask, 0.0, 1.0);
     vec3 torchBloom = color * 0.45;
     sceneBloom = mix(sceneBloom, torchBloom, torchFlame);
-    sceneBloom *= step(-0.5, localMask); // Held items do not feed the bright pass.
+    float heldEmission = clamp(-localMask - 1.0, 0.0, 1.0);
+    // Only selected emissive texels bypass the usual held-item exclusion.
+    sceneBloom = sceneBloom * step(-0.5, localMask) + color * heldEmission * 0.75;
     vec3 lavaBloom = mix(color, LAVA_BLOOM_COLOR, 0.58) * lavaMask * LAVA_BLOOM_STRENGTH * LAVA_EMISSION_INTENSITY;
     return max(sceneBloom, lavaBloom);
 }
